@@ -4,6 +4,7 @@ from typing import List
 
 import networkx as nx
 import pandas as pd
+from tqdm import tqdm
 
 
 def get_file_names(count: int, directory="../data/preprocessed/") -> List[str]:
@@ -54,15 +55,6 @@ def get_concept_attributes(c: dict) -> dict:
     }
 
 
-def generate_id(orig_id: str, prefix: str) -> str:
-    """
-    Generates an ID for a given concept or event
-    :param orig_id: the original ID of the concept or event
-    :param prefix: the prefix to be added to the ID (e.g. 'c' for concept, 'e' for event)
-    """
-    return f"{prefix}_{orig_id}"
-
-
 def generate_graph(
     files: List[str],
     include_concepts: bool = False,
@@ -77,36 +69,45 @@ def generate_graph(
     """
     G = nx.Graph()
 
-    for file in files:
+    for file in tqdm(files, desc="Generating graph", ncols=100):
         df = pd.read_pickle(file)
         for i, event in df.iterrows():
             info, similar_events = event["info"], event["similarEvents"]
-            event_id = generate_id(info["uri"], "e")
-
+            event_id = info["uri"]
             G.add_node(event_id, **get_event_attributes(event, False))
 
             if include_concepts:
-                concepts = info["concepts"]
-                for concept in concepts:
-                    concept_id = generate_id(concept["id"], "c")
-                    G.add_node(concept_id, **get_concept_attributes(concept))
-                    G.add_edge(
-                        event_id,
-                        concept_id,
-                        edge_type="concept",
-                        weight=concept["score"],
-                    )
+                G.add_nodes_from(
+                    [(c["id"], get_concept_attributes(c)) for c in info["concepts"]]
+                )
+                G.add_edges_from(
+                    [
+                        (
+                            event_id,
+                            c["id"],
+                            {"edge_type": "concept", "weight": c["score"]},
+                        )
+                        for c in info["concepts"]
+                    ]
+                )
 
             if include_similar_events:
-                for similar_event in similar_events:
-                    similar_id = generate_id(similar_event["uri"], "e")
-                    G.add_node(similar_id, **get_event_attributes(similar_event, True))
-                    G.add_edge(
-                        event_id,
-                        similar_id,
-                        edge_type="similar",
-                        weight=similar_event["sim"],
-                    )
+                G.add_nodes_from(
+                    [
+                        (se["uri"], get_event_attributes(se, True))
+                        for se in similar_events
+                    ]
+                )
+                G.add_edges_from(
+                    [
+                        (
+                            event_id,
+                            se["uri"],
+                            {"edge_type": "similar", "weight": se["sim"]},
+                        )
+                        for se in similar_events
+                    ]
+                )
 
     return G
 
@@ -122,13 +123,15 @@ def save_graph(graph: nx.Graph, name: str, directory="../data/graphs/"):
 
 
 if __name__ == "__main__":
-    n = 1
+    n = 1000
+    concepts = False
+    similar = True
 
-    print(f"Getting {n} file(s)...")
     files = get_file_names(n)
 
-    print("Generating graph...")
-    G = generate_graph(files, include_concepts=True, include_similar_events=True)
+    G = generate_graph(files, include_concepts=concepts, include_similar_events=similar)
 
     print("Saving graph...")
-    save_graph(G, f"{n}_concepts_similar")
+    save_graph(
+        G, f"{n}{'_concepts' if concepts else ''}{'_similar' if similar else ''}"
+    )
