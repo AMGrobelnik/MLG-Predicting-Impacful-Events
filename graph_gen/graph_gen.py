@@ -122,11 +122,13 @@ def save_graph(graph: nx.Graph, name: str, directory="../data/graphs/"):
 
 
 if __name__ == "__main__":
-    # Generate graph
-    files = get_file_names(100)
+    n = 1
+
+    print(f"Getting {n} file(s)...")
+    files = get_file_names(n)
 
     print("Generating graph...")
     G = generate_graph(files, include_concepts=True, include_similar_events=True)
 
     print("Saving graph...")
-    save_graph(G, "100_concepts_similar")
+    save_graph(G, f"{n}_concepts_similar")
