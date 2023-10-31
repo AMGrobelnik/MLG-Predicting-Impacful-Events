@@ -45,10 +45,9 @@ def filter_json(json_content):
     dataframe = pd.DataFrame(filtered_events)
     return dataframe
 
-directory_path = "./"
-output_dir = "./data_pickle_files"
-for filename in os.listdir(directory_path):
-
+directory_path = "./data/source"
+output_dir = "./data/preprocessed"
+for filename in sorted(os.listdir(directory_path)):
     file_path = os.path.join(directory_path, filename)
     if file_path.endswith(".json"):
         json_content = load_json_file(file_path)
@@ -57,5 +56,6 @@ for filename in os.listdir(directory_path):
         file_name = os.path.splitext(filename)[0]
 
         save_df_to_pickle(dataframe, output_dir, file_name)
+        i += 1
     
 
