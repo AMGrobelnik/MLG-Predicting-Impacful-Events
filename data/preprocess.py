@@ -45,11 +45,12 @@ def filter_json(json_content):
     dataframe = pd.DataFrame(filtered_events)
     return dataframe
 
-directory_path = "./data/source"
-output_dir = "./data/preprocessed"
+directory_path = "./source"
+output_dir = "./preprocessed"
 for filename in sorted(os.listdir(directory_path)):
     file_path = os.path.join(directory_path, filename)
     if file_path.endswith(".json"):
+        print(f"Processing '{os.path.splitext(filename)[0]}'...")
         json_content = load_json_file(file_path)
         dataframe = filter_json(json_content)
 
