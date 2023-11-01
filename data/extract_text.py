@@ -51,13 +51,16 @@ if __name__ == "__main__":
 
     files = sorted(os.listdir(directory_path))
 
-    data = pd.DataFrame(columns=columns)
-    data.set_index("id", inplace=True)
+    # data = pd.DataFrame(columns=columns)
+    # data.set_index("id", inplace=True)
 
     for filename in tqdm(files, ncols=100, desc="Processing"):
         file_path = os.path.join(directory_path, filename)
+        file_name = os.path.splitext(filename)[0]
         if file_path.endswith(".pkl"):
             df = extract_text(file_path)
-            data = pd.concat([data, df])
+            #data = pd.concat([data, df])
 
-    save_df_to_pickle(data, output_dir, "text")
+            save_df_to_pickle(df, output_dir, file_name)
+
+    # save_df_to_pickle(data, output_dir, "text")
