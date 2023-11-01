@@ -50,6 +50,26 @@ def get_concept_attributes(c: dict) -> dict:
     }
 
 
+def get_concepts(event_id: str, concepts: dict):
+    nodes = [(c["id"], get_concept_attributes(c)) for c in concepts]
+    edges = [
+        (event_id, c["id"], {"edge_type": "related", "weight": c["score"]})
+        for c in concepts
+    ]
+
+    return nodes, edges
+
+
+def get_similar_events(event_id: str, similar_events: dict):
+    nodes = [(se["uri"], get_event_attributes(se, True)) for se in similar_events]
+    edges = [
+        (event_id, se["uri"], {"edge_type": "similar", "weight": se["sim"]})
+        for se in similar_events
+    ]
+
+    return nodes, edges
+
+
 def generate_graph(
     files: List[str],
     include_concepts: bool = False,
@@ -72,37 +92,14 @@ def generate_graph(
             G.add_node(event_id, **get_event_attributes(event, False))
 
             if include_concepts:
-                G.add_nodes_from(
-                    [(c["id"], get_concept_attributes(c)) for c in info["concepts"]]
-                )
-                G.add_edges_from(
-                    [
-                        (
-                            event_id,
-                            c["id"],
-                            {"edge_type": "related", "weight": c["score"]},
-                        )
-                        for c in info["concepts"]
-                    ]
-                )
+                c_nodes, c_edges = get_concepts(event_id, info["concepts"])
+                G.add_nodes_from(c_nodes)
+                G.add_edges_from(c_edges)
 
             if include_similar_events:
-                G.add_nodes_from(
-                    [
-                        (se["uri"], get_event_attributes(se, True))
-                        for se in similar_events
-                    ]
-                )
-                G.add_edges_from(
-                    [
-                        (
-                            event_id,
-                            se["uri"],
-                            {"edge_type": "similar", "weight": se["sim"]},
-                        )
-                        for se in similar_events
-                    ]
-                )
+                se_nodes, se_edges = get_similar_events(event_id, similar_events)
+                G.add_nodes_from(se_nodes)
+                G.add_edges_from(se_edges)
 
     return G
 
