@@ -4,6 +4,7 @@ from typing import List
 
 import networkx as nx
 import pandas as pd
+import torch
 from tqdm import tqdm
 
 
@@ -25,19 +26,14 @@ def get_event_attributes(event: dict, similar_event: bool) -> dict:
     :param event: the event to generate features for
     :param similar_event: whether the event is a similar event (and does not have all the attributes)
     """
-
-    if similar_event:
-        return {"type": "event", "features": {"eventDate": event["eventDate"]}}
-
-    info = event["info"]
+    article_count = -1 if similar_event else event["info"]["articleCounts"]["total"]
+    event_date = event["eventDate"] if similar_event else event["info"]["eventDate"]
+    feature_tensor = torch.tensor([article_count, event_date])
 
     return {
-        "type": "event",
-        "features": {
-            "eventDate": info["eventDate"],
-            "article_count": info["articleCounts"]["total"],
-            # TODO: LLM embeddings
-        },
+        "node_type": "event",
+        "node_feature": feature_tensor,
+        # TODO: LLM embeddings
     }
 
 
@@ -46,12 +42,11 @@ def get_concept_attributes(c: dict) -> dict:
     Generates a dictionary of features for a given concept
     """
     return {
-        "type": "concept",
-        "features": {
-            "concept_label": c["labelEng"],
-            # 'concept_type': c['type'],
-            # 'uri': c['uri']
-        },
+        "node_type": "concept",
+        # "concept_label": c["labelEng"],
+        # 'concept_type': c['type'],
+        # 'uri': c['uri']
+        "node_feature": torch.tensor([1, 1, 1, 1, 1]),
     }
 
 
@@ -85,7 +80,7 @@ def generate_graph(
                         (
                             event_id,
                             c["id"],
-                            {"edge_type": "concept", "weight": c["score"]},
+                            {"edge_type": "related", "weight": c["score"]},
                         )
                         for c in info["concepts"]
                     ]
@@ -123,15 +118,17 @@ def save_graph(graph: nx.Graph, name: str, directory="../data/graphs/"):
 
 
 if __name__ == "__main__":
-    n = 1000
-    concepts = False
+    n = 1
+    concepts = True
     similar = True
 
     files = get_file_names(n)
 
-    G = generate_graph(files, include_concepts=concepts, include_similar_events=similar)
+    graph = generate_graph(
+        files, include_concepts=concepts, include_similar_events=similar
+    )
 
     print("Saving graph...")
     save_graph(
-        G, f"{n}{'_concepts' if concepts else ''}{'_similar' if similar else ''}"
+        graph, f"{n}{'_concepts' if concepts else ''}{'_similar' if similar else ''}"
     )
