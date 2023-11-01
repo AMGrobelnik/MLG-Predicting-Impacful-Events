@@ -116,7 +116,7 @@ def save_graph(graph: nx.Graph, name: str, directory="../data/graphs/"):
 
 if __name__ == "__main__":
     n = 1
-    concepts = True
+    concepts = False
     similar = True
 
     files = get_file_names(n)
