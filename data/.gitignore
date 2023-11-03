@@ -1,0 +1,7 @@
+source/*
+preprocessed/*
+graphs/*
+text/*
+
+# Don't ignore .gitkeep files
+!.gitkeep
