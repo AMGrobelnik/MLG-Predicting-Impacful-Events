@@ -83,13 +83,17 @@ def filter_json(json_content):
 if __name__ == "__main__":
     directory_path = "./source"
     output_dir = "./preprocessed"
-    files = sorted(os.listdir(directory_path))[:200]
+
+    files = sorted(os.listdir(directory_path))
+    files = [filename for filename in files if filename.endswith(".json")]
+
+    files = files[:200]
     for filename in tqdm(files, ncols=100, desc="Processing"):
         file_path = os.path.join(directory_path, filename)
-        if file_path.endswith(".json"):
-            json_content = load_json_file(file_path)
-            dataframe = filter_json(json_content)
 
-            file_name = os.path.splitext(filename)[0]
+        json_content = load_json_file(file_path)
+        dataframe = filter_json(json_content)
 
-            save_df_to_pickle(dataframe, output_dir, file_name)
+        file_name = os.path.splitext(filename)[0]
+
+        save_df_to_pickle(dataframe, output_dir, file_name)
