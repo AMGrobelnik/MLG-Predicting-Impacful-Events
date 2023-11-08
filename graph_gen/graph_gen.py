@@ -47,7 +47,7 @@ def get_concept_attributes(c: dict) -> dict:
         # "concept_label": c["labelEng"],
         # 'concept_type': c['type'],
         # 'uri': c['uri']
-        "node_feature": torch.tensor([1.0, 1.0, 1.0], dtype=torch.float32),
+        "node_feature": torch.tensor([1.0, 1.0], dtype=torch.float32),
     }
 
 
