@@ -28,11 +28,12 @@ def get_event_attributes(event: dict, similar_event: bool) -> dict:
     """
     article_count = -1 if similar_event else event["info"]["articleCounts"]["total"]
     event_date = event["eventDate"] if similar_event else event["info"]["eventDate"]
-    feature_tensor = torch.tensor([article_count, event_date])
+    feature_tensor = torch.tensor([article_count, event_date], dtype=torch.float32)
 
     return {
         "node_type": "event",
         "node_feature": feature_tensor,
+        "node_target": torch.tensor([article_count], dtype=torch.float32),
         # TODO: LLM embeddings
     }
 
@@ -46,7 +47,7 @@ def get_concept_attributes(c: dict) -> dict:
         # "concept_label": c["labelEng"],
         # 'concept_type': c['type'],
         # 'uri': c['uri']
-        "node_feature": torch.tensor([1, 1, 1, 1, 1]),
+        "node_feature": torch.tensor([1.0, 1.0], dtype=torch.float32),
     }
 
 
@@ -62,7 +63,6 @@ def get_concepts(event_id: str, concepts: dict):
     ]
 
     return nodes, edges1, edges2
-
 
 
 def get_similar_events(event_id: str, similar_events: dict):
@@ -131,17 +131,17 @@ if __name__ == "__main__":
         files, include_concepts=concepts, include_similar_events=similar
     )
 
-    ec = 0
-    ce = 0
-    for edge in graph.edges(data=True):
-        if graph.nodes[edge[0]]['node_type'] == 'event' and graph.nodes[edge[1]]['node_type'] == 'concept':
-            ec +=1
-        if graph.nodes[edge[0]]['node_type'] == 'concept' and graph.nodes[edge[1]]['node_type'] == 'event':
-            ce +=1
+    # ec = 0
+    # ce = 0
+    # for edge in graph.edges(data=True):
+    #     if graph.nodes[edge[0]]['node_type'] == 'event' and graph.nodes[edge[1]]['node_type'] == 'concept':
+    #         ec +=1
+    #     if graph.nodes[edge[0]]['node_type'] == 'concept' and graph.nodes[edge[1]]['node_type'] == 'event':
+    #         ce +=1
+    #
+    # print("E TO C", ec, ce)
 
-    print("E TO C", ec, ce)
-
-    # print("Saving graph...")
-    # save_graph(
-    #     graph, f"{n}{'_concepts' if concepts else ''}{'_similar' if similar else ''}"
-    # )
+    print("Saving graph...")
+    save_graph(
+        graph, f"{n}{'_concepts' if concepts else ''}{'_similar' if similar else ''}"
+    )
