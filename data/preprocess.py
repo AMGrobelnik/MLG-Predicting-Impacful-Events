@@ -19,7 +19,7 @@ def event_date_to_timestamp(event: dict, similar_event: bool):
     event_date = event["eventDate"] if similar_event else event["info"]["eventDate"]
     if event_date == "":
         return 0
-    return dt.strptime(event_date, "%Y-%m-%d").timestamp()
+    return round(dt.strptime(event_date, "%Y-%m-%d").timestamp() / 3600 / 24)
 
 
 def load_json_file(file_path):
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     files = sorted(os.listdir(directory_path))
     files = [filename for filename in files if filename.endswith(".json")]
 
-    files = files[:200]
+    files = files[:201]
     for filename in tqdm(files, ncols=100, desc="Processing"):
         file_path = os.path.join(directory_path, filename)
 
