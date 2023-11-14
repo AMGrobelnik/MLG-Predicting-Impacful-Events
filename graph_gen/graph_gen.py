@@ -105,12 +105,13 @@ def generate_graph(
     if include_llm_embeddings:
         df_llm = pd.read_pickle("../data/text/llm_embeddings.pkl")
 
-    for file in tqdm(files, desc="Generating graph", ncols=100):
+    for file in tqdm(files, desc="Adding similar events and concepts", ncols=100):
+        if not include_similar_events and not include_concepts:
+            break
         df = pd.read_pickle(file)
         for i, event in df.iterrows():
             info, similar_events = event["info"], event["similarEvents"]
             event_id = info["uri"]
-            G.add_node(event_id, **get_event_attributes(event, False, df_llm))
 
             if include_concepts:
                 c_nodes, c_edges = get_concepts(event_id, info["concepts"])
@@ -123,6 +124,14 @@ def generate_graph(
                 )
                 G.add_nodes_from(se_nodes)
                 G.add_edges_from(se_edges)
+
+    # Add event data last to avoid overwriting
+    for file in tqdm(files, desc="Adding event data", ncols=100):
+        df = pd.read_pickle(file)
+        for _, event in df.iterrows():
+            info, similar_events = event["info"], event["similarEvents"]
+            event_id = info["uri"]
+            G.add_node(event_id, **get_event_attributes(event, False, df_llm))
 
     return G
 
@@ -141,7 +150,7 @@ if __name__ == "__main__":
     n = 1
     concepts = True
     similar = True
-    llm_embeddings = True
+    llm_embeddings = False
 
     remove_future = False
     future_period = 7  # days around the event date where it is not considered future
