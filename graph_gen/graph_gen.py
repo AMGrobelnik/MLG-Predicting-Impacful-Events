@@ -146,20 +146,10 @@ def save_graph(graph: nx.Graph, name: str, directory="../data/graphs/"):
         pickle.dump(graph, f)
 
 
-if __name__ == "__main__":
-    n = 1
-    concepts = True
-    similar = True
-    llm_embeddings = False
-
-    remove_future = False
-    future_period = 7  # days around the event date where it is not considered future
-
-    files = get_file_names(n)
-
-    graph = generate_graph(files, concepts, similar, llm_embeddings)
-
-    # Add node degree as a feature to 'concept' nodes
+def add_concept_degree(graph: nx.Graph):
+    """
+    Adds node degree as a feature to concepts
+    """
     for node in tqdm(graph.nodes(), desc="Adding node degree to concepts", ncols=100):
         if graph.nodes[node]["node_type"] != "concept":
             continue
@@ -167,32 +157,76 @@ if __name__ == "__main__":
             [graph.degree(node)], dtype=torch.float32
         )
 
+
+def prune_disconnected(graph: nx.Graph):
+    """
+    Removes all nodes that are not connected to any other node
+    """
+    nodes_to_remove = []
+    for node in tqdm(graph.nodes(), desc="Removing disconnected nodes", ncols=100):
+        if graph.degree(node) == 0:
+            nodes_to_remove.append(node)
+    graph.remove_nodes_from(nodes_to_remove)
+    print(f"Removed {len(nodes_to_remove)} disconnected nodes")
+
+
+def remove_future_edges(graph: nx.Graph, threshold: int):
+    """
+    Removes all edges that point to the future
+    """
+    to_remove = []
+    for u, v, data in tqdm(graph.edges(data=True), desc="Removing future", ncols=100):
+        if data["edge_type"] != "similar":
+            continue
+        d1 = graph.nodes[u]["node_feature"][0]
+        d2 = graph.nodes[v]["node_feature"][0]
+
+        # simultaneous events are not removed
+        if abs(d1 - d2) <= threshold:
+            continue
+
+        # remove the edge if it points to the past
+        if d1 < d2:
+            to_remove.append((u, v))
+
+    graph.remove_edges_from(to_remove)
+
+
+def remove_unknown_events(graph: nx.Graph):
+    """
+    Removes all events that do not have a target
+    """
+    to_remove = []
+    for node in tqdm(graph.nodes(), desc="Removing unknown events", ncols=100):
+        if graph.nodes[node]["node_type"] != "event":
+            continue
+        if graph.nodes[node]["node_target"][0] == -1:
+            to_remove.append(node)
+    graph.remove_nodes_from(to_remove)
+
+
+n = 10
+concepts = True
+similar = True
+llm_embeddings = True
+
+remove_future = True
+future_threshold = 1
+
+
+if __name__ == "__main__":
+    files = get_file_names(n)
+
+    graph = generate_graph(files, concepts, similar, llm_embeddings)
+    # remove_unknown_events(graph)
+    add_concept_degree(graph)
+    prune_disconnected(graph)
+
     for i in tqdm([1], desc="To directed", ncols=100):
         graph = graph.to_directed()
 
     if remove_future:
-        to_remove = []
-        for u, v, data in tqdm(
-            graph.edges(data=True), desc="Removing future", ncols=100
-        ):
-            edge_type = data["edge_type"]
-            if edge_type != "similar":
-                continue
-            d1, d2 = (
-                graph.nodes[u]["node_feature"][0],
-                graph.nodes[v]["node_feature"][0],
-            )
-
-    # remove events where node_target[0] is -1
-    # nodes_to_remove = []
-    # for node in tqdm(
-    #     graph.nodes(), desc="Removing events with -1 node_target", ncols=100
-    # ):
-    #     if graph.nodes[node]["node_type"] != "event":
-    #         continue
-    #     if graph.nodes[node]["node_target"][0] == -1:
-    #         nodes_to_remove.append(node)
-    # graph.remove_nodes_from(nodes_to_remove)
+        remove_future_edges(graph, future_threshold)
 
     for i in tqdm([1], desc="Saving graph", ncols=100):
         name = f"{n}"
