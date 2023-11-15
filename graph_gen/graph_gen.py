@@ -29,6 +29,8 @@ def get_event_attributes(
     :param event: the event to generate features for
     :param similar_event: whether the event is a similar event (and does not have all the attributes)
     """
+    global remove_future, cheat
+
     uri = event["info"]["uri"] if not similar_event else event["uri"]
     article_count = -1 if similar_event else event["info"]["articleCounts"]["total"]
     event_date = event["eventDate"] if similar_event else event["info"]["eventDate"]
@@ -42,6 +44,9 @@ def get_event_attributes(
             feature_tensor = torch.cat((feature_tensor, summary))  # title
         else:
             feature_tensor = torch.cat((feature_tensor, torch.zeros(768 * 1)))
+
+    if remove_future or cheat:  # TODO: hide the article_count from train data
+        feature_tensor = torch.cat((torch.tensor([article_count], dtype=torch.float32), feature_tensor))
 
     return {
         "node_type": "event",
@@ -141,7 +146,7 @@ def save_graph(graph: nx.Graph, name: str, directory="../data/graphs/"):
     Saves the graph in a pickle file
     """
     path = os.path.join(directory, f"{name}.pkl")
-
+    tqdm.write(f"Saving to {name}.pkl")
     with open(path, "wb") as f:
         pickle.dump(graph, f)
 
@@ -167,7 +172,7 @@ def prune_disconnected(graph: nx.Graph):
         if graph.degree(node) == 0:
             nodes_to_remove.append(node)
     graph.remove_nodes_from(nodes_to_remove)
-    print(f"Removed {len(nodes_to_remove)} disconnected nodes")
+    tqdm.write(f"Removed {len(nodes_to_remove)} disconnected nodes")
 
 
 def remove_future_edges(graph: nx.Graph, threshold: int):
@@ -190,6 +195,7 @@ def remove_future_edges(graph: nx.Graph, threshold: int):
             to_remove.append((u, v))
 
     graph.remove_edges_from(to_remove)
+    tqdm.write(f"Removed {len(to_remove)} future edges")
 
 
 def remove_unknown_events(graph: nx.Graph):
@@ -197,30 +203,65 @@ def remove_unknown_events(graph: nx.Graph):
     Removes all events that do not have a target
     """
     to_remove = []
-    for node in tqdm(graph.nodes(), desc="Removing unknown events", ncols=100):
-        if graph.nodes[node]["node_type"] != "event":
+    for node, data in tqdm(graph.nodes(data=True), desc="Removing unknown events", ncols=100):
+        if data["node_type"] != "event":
             continue
-        if graph.nodes[node]["node_target"][0] == -1:
+        if data["node_target"][0] == -1:
             to_remove.append(node)
     graph.remove_nodes_from(to_remove)
+    tqdm.write(f"Removed {len(to_remove)} unknown events")
+
+
+def print_graph_statistics(graph: nx.Graph):
+    """
+    Prints some statistics about the graph
+    """
+    node_c = graph.number_of_nodes()
+    edge_c = graph.number_of_edges()
+    concepts = len([n for n in graph.nodes() if n.startswith("c")])
+    events = len([n for n in graph.nodes() if n.startswith("e")])
+    concept_edges = len([data for _, _, data in graph.edges(data=True) if data["edge_type"] == "related"])
+    event_edges = len([data for _, _, data in graph.edges(data=True) if data["edge_type"] == "similar"])
+    counts = 0
+    for _, data in graph.nodes(data=True):
+        if data["node_type"] == "event":
+            if data["node_target"][0] > 0:
+                counts += 1
+
+    tqdm.write("Success!!")
+    tqdm.write(f"Number of nodes: {node_c}")
+    tqdm.write(f"Number of edges: {edge_c}")
+    tqdm.write(f"Number of concepts: {concepts} ({round(concepts / node_c * 100, 2)}%)")
+    tqdm.write(f"Number of events: {events} ({round(events / node_c * 100, 2)}%)")
+    tqdm.write(
+        f"Number of events with target: {counts} ({round(counts / events * 100, 2)}%)"
+    )
+    tqdm.write(
+        f"Number of concept edges: {concept_edges} ({round(concept_edges / edge_c * 100, 2)}%)"
+    )
+    tqdm.write(
+        f"Number of event edges: {event_edges} ({round(event_edges / edge_c * 100, 2)}%)"
+    )
 
 
 n = 10
 concepts = True
 similar = True
 llm_embeddings = True
+cheat = True  # include article counts in the node features
 
-remove_future = True
-future_threshold = 1
+remove_unknown = True
+remove_future = False
+future_threshold = 0
 
 
 if __name__ == "__main__":
     files = get_file_names(n)
 
     graph = generate_graph(files, concepts, similar, llm_embeddings)
-    # remove_unknown_events(graph)
-    add_concept_degree(graph)
-    prune_disconnected(graph)
+
+    if remove_unknown:
+        remove_unknown_events(graph)  # TODO: Maybe keep the edges
 
     for i in tqdm([1], desc="To directed", ncols=100):
         graph = graph.to_directed()
@@ -228,10 +269,17 @@ if __name__ == "__main__":
     if remove_future:
         remove_future_edges(graph, future_threshold)
 
+    prune_disconnected(graph)
+    add_concept_degree(graph)
+
     for i in tqdm([1], desc="Saving graph", ncols=100):
         name = f"{n}"
         name += "_concepts" if concepts else ""
         name += "_similar" if similar else ""
         name += "_llm" if llm_embeddings else ""
         name += "_noFuture" if remove_future else ""
+        name += "_noUnknown" if remove_unknown else ""
+        name += "_CHEAT" if cheat else ""
         save_graph(graph, name)
+
+    print_graph_statistics(graph)

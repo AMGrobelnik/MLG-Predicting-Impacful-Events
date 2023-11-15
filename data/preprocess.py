@@ -64,7 +64,8 @@ def filter_json(json_content):
             article_counts_total = event["info"]["articleCounts"]["total"]
 
             if article_counts_total == 0:
-                event["info"]["articleCounts"]["total"] = -1
+                continue
+                # event["info"]["articleCounts"]["total"] = -1
 
             # fix json structure
             event["similarEvents"] = event["similarEvents"]["similarEvents"]
@@ -102,7 +103,7 @@ if __name__ == "__main__":
     files = sorted(os.listdir(directory_path))
     files = [filename for filename in files if filename.endswith(".json")]
 
-    files = files[2750:]
+    files = files[:250]
     for filename in tqdm(files, ncols=100, desc="Processing"):
         file_path = os.path.join(directory_path, filename)
 
