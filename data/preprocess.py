@@ -45,19 +45,27 @@ def save_df_to_pickle(dataframe, output_dir, file_name):
 
 
 def filter_json(json_content):
+    global errors, merged
+
     filtered_events = []
     for event in json_content:
-        # generate unique ids
-        event["info"]["uri"] = generate_id(event["info"]["uri"], "e")
+        try:
+            # check if event is merged (event info is a string)
+            if isinstance(event["info"], str):
+                merged.append(event["info"])
+                continue
 
-        similar_events = event.get("similarEvents", {}).get("similarEvents", [])
-        concepts = event.get("info", {}).get("concepts", [])
-        article_counts_total = (
-            event.get("info", {}).get("articleCounts", {}).get("total", 0)
-        )
-        event["info"]["eventDate"] = event_date_to_timestamp(event, False)
+            # generate unique ids
+            event["info"]["uri"] = generate_id(event["info"]["uri"], "e")
+            event["info"]["eventDate"] = event_date_to_timestamp(event, False)
 
-        if similar_events or concepts or article_counts_total > 0:
+            similar_events = event["similarEvents"]["similarEvents"]
+            concepts = event["info"]["concepts"]
+            article_counts_total = event["info"]["articleCounts"]["total"]
+
+            if article_counts_total == 0:
+                event["info"]["articleCounts"]["total"] = -1
+
             # fix json structure
             event["similarEvents"] = event["similarEvents"]["similarEvents"]
 
@@ -67,19 +75,26 @@ def filter_json(json_content):
                 # convert to timestamp
                 se["eventDate"] = event_date_to_timestamp(se, True)
 
-            filtered_events.append(event)
-
             for c in concepts:
                 # generate unique ids
                 c["id"] = generate_id(c["id"], "c")
 
-        event["info"].pop("eventDateEnd", None)
-        event["info"].pop("categories", None)
+            filtered_events.append(event)
+
+            event["info"].pop("eventDateEnd", None)
+            event["info"].pop("categories", None)
+
+        except:
+            # print(event)
+            errors += 1
+            continue
 
     dataframe = pd.DataFrame(filtered_events)
     return dataframe
 
 
+errors = 0
+merged = []
 if __name__ == "__main__":
     directory_path = "./source"
     output_dir = "./preprocessed"
@@ -87,7 +102,7 @@ if __name__ == "__main__":
     files = sorted(os.listdir(directory_path))
     files = [filename for filename in files if filename.endswith(".json")]
 
-    files = files[:200]
+    files = files[2750:]
     for filename in tqdm(files, ncols=100, desc="Processing"):
         file_path = os.path.join(directory_path, filename)
 
@@ -97,3 +112,6 @@ if __name__ == "__main__":
         file_name = os.path.splitext(filename)[0]
 
         save_df_to_pickle(dataframe, output_dir, file_name)
+
+    print(f"Errors: {errors}")  # none (excluding the 14k merged events)
+    print(f"Merged: {len(merged)}")  # only 14k
