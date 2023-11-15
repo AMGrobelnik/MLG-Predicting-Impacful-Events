@@ -78,16 +78,11 @@ def get_concepts(event_id: str, concepts: dict):
     return nodes, edges
 
 
-def get_similar_events(
-    event_id: str, similar_events: dict, llm_df: pd.DataFrame = None
-):
-    nodes = [
-        (se["uri"], get_event_attributes(se, True, llm_df)) for se in similar_events
-    ]
-    edges = [
-        (event_id, se["uri"], {"edge_type": "similar", "weight": se["sim"]})
-        for se in similar_events
-    ]
+def get_similar_events(event_id: str, similar_events: dict, llm_df: pd.DataFrame = None):
+    nodes = [(se["uri"], get_event_attributes(se, True, llm_df))
+             for se in similar_events]
+    edges = [(event_id, se["uri"], {"edge_type": "similar", "weight": se["sim"]})
+             for se in similar_events]
 
     return nodes, edges
 
@@ -103,6 +98,7 @@ def generate_graph(
     :param files: list of file paths
     :param include_concepts: include the concepts in the graph
     :param include_similar_events: include the similar events and their edges in the graph
+    :param include_llm_embeddings: include the LLM embeddings in the graph
     :return:
     """
     G = nx.Graph()
@@ -110,20 +106,13 @@ def generate_graph(
     if include_llm_embeddings:
         df_llm = pd.read_pickle("../data/text/llm_embeddings.pkl")
 
-    for file in tqdm(files, desc="Adding similar events and concepts", ncols=100):
-        if not include_similar_events and not include_concepts:
-            break
-        df = pd.read_pickle(file)
-        for i, event in df.iterrows():
-            info, similar_events = event["info"], event["similarEvents"]
-            event_id = info["uri"]
+    if include_similar_events:
+        for file in tqdm(files, desc="Adding similar events", ncols=100):
+            df = pd.read_pickle(file)
+            for _, event in df.iterrows():
+                info, similar_events = event["info"], event["similarEvents"]
+                event_id = info["uri"]
 
-            if include_concepts:
-                c_nodes, c_edges = get_concepts(event_id, info["concepts"])
-                G.add_nodes_from(c_nodes)
-                G.add_edges_from(c_edges)
-
-            if include_similar_events:
                 se_nodes, se_edges = get_similar_events(
                     event_id, similar_events, df_llm
                 )
@@ -134,9 +123,18 @@ def generate_graph(
     for file in tqdm(files, desc="Adding event data", ncols=100):
         df = pd.read_pickle(file)
         for _, event in df.iterrows():
-            info, similar_events = event["info"], event["similarEvents"]
-            event_id = info["uri"]
+            event_id = event["info"]["uri"]
             G.add_node(event_id, **get_event_attributes(event, False, df_llm))
+
+    if include_concepts:
+        for file in tqdm(files, desc="Adding concepts", ncols=100):
+            df = pd.read_pickle(file)
+            for _, event in df.iterrows():
+                info = event["info"]
+                event_id = info["uri"]
+                c_nodes, c_edges = get_concepts(event_id, info["concepts"])
+                G.add_nodes_from(c_nodes)
+                G.add_edges_from(c_edges)
 
     return G
 
@@ -244,13 +242,13 @@ def print_graph_statistics(graph: nx.Graph):
     )
 
 
-n = 10
+n = 1
 concepts = True
 similar = True
 llm_embeddings = True
 cheat = True  # include article counts in the node features
 
-remove_unknown = True
+remove_unknown = False
 remove_future = False
 future_threshold = 0
 
@@ -269,7 +267,7 @@ if __name__ == "__main__":
     if remove_future:
         remove_future_edges(graph, future_threshold)
 
-    prune_disconnected(graph)
+    # prune_disconnected(graph)
     add_concept_degree(graph)
 
     for i in tqdm([1], desc="Saving graph", ncols=100):

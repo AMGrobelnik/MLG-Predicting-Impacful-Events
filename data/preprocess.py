@@ -19,7 +19,7 @@ def event_date_to_timestamp(event: dict, similar_event: bool):
     event_date = event["eventDate"] if similar_event else event["info"]["eventDate"]
     if event_date == "":
         return 0
-    return dt.strptime(event_date, "%Y-%m-%d").timestamp()
+    return round(dt.strptime(event_date, "%Y-%m-%d").timestamp() / 3600 / 24)
 
 
 def load_json_file(file_path):
