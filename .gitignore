@@ -7,7 +7,7 @@
 
 #MLG PROJECT SPECIFIC
 /temp/
-Heterogeneus/*.pkl
+/Heterogeneus/*.pkl
 
 # User-specific stuff
 .idea/**/workspace.xml
