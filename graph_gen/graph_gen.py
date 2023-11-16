@@ -242,7 +242,7 @@ def print_graph_statistics(graph: nx.Graph):
     )
 
 
-n = 1
+n = 20
 concepts = True
 similar = True
 llm_embeddings = True
