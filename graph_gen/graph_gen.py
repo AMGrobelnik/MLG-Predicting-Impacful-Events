@@ -246,7 +246,7 @@ n = 1
 concepts = True
 similar = True
 llm_embeddings = True
-cheat = True  # include article counts in the node features
+cheat = False  # include article counts in the node features
 
 remove_unknown = False
 remove_future = False
