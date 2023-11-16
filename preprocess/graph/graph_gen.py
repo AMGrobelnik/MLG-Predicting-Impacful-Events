@@ -8,7 +8,7 @@ import torch
 from tqdm import tqdm
 
 
-def get_file_names(count: int, directory="../data/preprocessed/") -> List[str]:
+def get_file_names(count: int, directory="../../data/preprocessed/") -> List[str]:
     """
     Returns a list of paths to the preprocessed .pkl files
     """
@@ -139,7 +139,7 @@ def generate_graph(
     return G
 
 
-def save_graph(graph: nx.Graph, name: str, directory="../data/graphs/"):
+def save_graph(graph: nx.Graph, name: str, directory="../../data/graphs/"):
     """
     Saves the graph in a pickle file
     """
@@ -242,7 +242,7 @@ def print_graph_statistics(graph: nx.Graph):
     )
 
 
-n = 20
+n = 5
 concepts = True
 similar = True
 llm_embeddings = True
