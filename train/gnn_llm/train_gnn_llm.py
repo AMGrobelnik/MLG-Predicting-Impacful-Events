@@ -13,10 +13,13 @@ from torch_sparse import SparseTensor, matmul
 
 import pickle
 import networkx as nx
+import wandb
+import optuna
+import argparse
 
 from hetero_gnn import HeteroGNN
 
-args = {
+train_args = {
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     "hidden_size": 48,
     "epochs": 500,
@@ -120,7 +123,7 @@ def graph_tensors_to_device(hetero_graph):
     # Send node features to device
     for key in hetero_graph.node_feature:
         hetero_graph.node_feature[key] = hetero_graph.node_feature[key].to(
-            args["device"]
+            train_args["device"]
         )
 
     # Create a torch.SparseTensor from edge_index and send it to device
@@ -150,11 +153,11 @@ def graph_tensors_to_device(hetero_graph):
                 hetero_graph.num_nodes(key[2]),
             ),
         )
-        hetero_graph.edge_index[key] = adj.t().to(args["device"])
+        hetero_graph.edge_index[key] = adj.t().to(train_args["device"])
 
     # Send node targets to device
     for key in hetero_graph.node_target:
-        hetero_graph.node_target[key] = hetero_graph.node_target[key].to(args["device"])
+        hetero_graph.node_target[key] = hetero_graph.node_target[key].to(train_args["device"])
 
 
 def create_split(hetero_graph):
@@ -165,21 +168,21 @@ def create_split(hetero_graph):
     s2 = 0.8
 
     train_idx = {
-        "event": torch.tensor(range(0, int(nEvents * s1))).to(args["device"]),
-        "concept": torch.tensor(range(0, int(nConcepts * s1))).to(args["device"]),
+        "event": torch.tensor(range(0, int(nEvents * s1))).to(train_args["device"]),
+        "concept": torch.tensor(range(0, int(nConcepts * s1))).to(train_args["device"]),
     }
     val_idx = {
         "event": torch.tensor(range(int(nEvents * s1), int(nEvents * s2))).to(
-            args["device"]
+            train_args["device"]
         ),
         "concept": torch.tensor(range(int(nConcepts * s1), int(nConcepts * s2))).to(
-            args["device"]
+            train_args["device"]
         ),
     }
     test_idx = {
-        "event": torch.tensor(range(int(nEvents * s2), nEvents)).to(args["device"]),
+        "event": torch.tensor(range(int(nEvents * s2), nEvents)).to(train_args["device"]),
         "concept": torch.tensor(range(int(nConcepts * s2), nConcepts)).to(
-            args["device"]
+            train_args["device"]
         ),
     }
 
@@ -190,35 +193,104 @@ def create_split(hetero_graph):
     return [train_idx, val_idx, test_idx]
 
 
-def display_results():
+def display_results(best_model):
     # TODO: Display the results of the model
     raise NotImplementedError()
 
 
-if __name__ == "__main__":
-    # Load the heterogeneous graph data
-    with open("./1_concepts_similar_llm.pkl", "rb") as f:
-        G = pickle.load(f)
+def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
+    # Initialize wandb run
+    wandb.init(
+        project="V2_MLG_PredEvents_GNN+LMM",
+        config={
+            "lr": trial.suggest_float("lr", 1e-5, 1e-1, log=True),
+            "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True),
+            "hidden_size": trial.suggest_int("hidden_size", 16, 128),
+            "attn_size": 32,  # Fixed value
+            "epochs": trial.suggest_int("epochs", 150, 300),
+            "num_layers": 2,  # Fixed value
+        },
+    )
 
-    # Create a HeteroGraph object from the networkx graph
-    hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
+    # Use wandb config
+    config = wandb.config
 
-    # Send all the necessary tensors to the same device
-    graph_tensors_to_device(hetero_graph)
+    # Initialize the model with the new hyperparameters
+    model = HeteroGNN(
+        hetero_graph,
+        {
+            "hidden_size": config.hidden_size,
+            "attn_size": config.attn_size,
+            "device": train_args["device"],
+        },
+        num_layers=config.num_layers,
+        aggr="mean",
+    ).to(train_args["device"])
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=config.lr, weight_decay=config.weight_decay
+    )
 
-    # Create a split of the graph data
+    # Initialize best scores with infinity
+    best_tvt_scores = (float("inf"), float("inf"), float("inf"))
+
+    # Training loop
+    for epoch in range(config.epochs):
+        train_loss = train(model, optimizer, hetero_graph, train_idx)
+        cur_tvt_scores, best_tvt_scores, _ = test(
+            model, hetero_graph, [train_idx, val_idx, test_idx], None, best_tvt_scores
+        )
+
+        # Log metrics to wandb
+        wandb.log(
+            {
+                "epoch": epoch,
+                "train_loss": train_loss,
+                "val_score": cur_tvt_scores[1],
+                "best_val_score": best_tvt_scores[1],
+            }
+        )
+
+        # Update the best validation score
+        if cur_tvt_scores[1] < best_tvt_scores[1]:
+            best_tvt_scores = (cur_tvt_scores[0], cur_tvt_scores[1], cur_tvt_scores[2])
+
+    # Finish wandb run
+    wandb.finish()
+
+    # The objective value is the best validation score
+    return best_tvt_scores[1]
+
+
+def hyper_parameter_tuning(hetero_graph):
+    study = optuna.create_study(direction="minimize")
+
     train_idx, val_idx, test_idx = create_split(hetero_graph)
+    study.optimize(
+        lambda trial: objective(trial, hetero_graph, train_idx, val_idx, test_idx),
+        n_trials=500,
+    )
 
+    print("Best trial:")
+    trial = study.best_trial
+    print(f"Value: {trial.value}")
+    print("Params: ")
+    for key, value in trial.params.items():
+        print(f"    {key}: {value}")
+
+
+def train_model(hetero_graph):
     best_model = None
     best_tvt_scores = (float("inf"), float("inf"), float("inf"))
 
-    model = HeteroGNN(hetero_graph, args, num_layers=2, aggr="attn").to(args["device"])
+    model = HeteroGNN(hetero_graph, train_args, num_layers=2, aggr="attn").to(train_args["device"])
+
+    train_idx, val_idx, test_idx = create_split(hetero_graph)
 
     optimizer = torch.optim.Adam(
-        model.parameters(), lr=args["lr"], weight_decay=args["weight_decay"]
+        model.parameters(), lr=train_args["lr"], weight_decay=train_args["weight_decay"]
     )
 
-    for epoch in range(args["epochs"]):
+    for epoch in range(train_args["epochs"]):
         # Train
         loss = train(model, optimizer, hetero_graph, train_idx)
         # Test for the accuracy of the model
@@ -234,3 +306,31 @@ if __name__ == "__main__":
         )
 
     print("Best Train,Val,Test Scores", [score.item() for score in best_tvt_scores])
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Run HeteroGNN model training or hyperparameter tuning."
+    )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["train", "tune"],
+        help="Run mode: 'train' or 'tune'",
+    )
+    args = parser.parse_args()
+
+    # Load the heterogeneous graph data
+    with open("./1_concepts_similar_llm.pkl", "rb") as f:
+        G = pickle.load(f)
+
+    # Create a HeteroGraph object from the networkx graph
+    hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
+
+    # Send all the necessary tensors to the same device
+    graph_tensors_to_device(hetero_graph)
+
+    if args.mode == "tune":
+        hyper_parameter_tuning(hetero_graph)
+    if args.mode == "train":
+        train_model(hetero_graph)
