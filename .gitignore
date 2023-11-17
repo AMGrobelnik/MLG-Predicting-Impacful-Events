@@ -7,9 +7,8 @@
 
 #MLG PROJECT SPECIFIC
 /temp/
-/Heterogeneus/*.pkl
-/Heterogeneus/wandb/*
 /train/wandb/*
+/train/gnn_llm/*.pkl
 
 # User-specific stuff
 .idea/**/workspace.xml
