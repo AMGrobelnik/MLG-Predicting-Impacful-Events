@@ -19,24 +19,56 @@
             "cwd": "C:\\Users\\Adrian\\AI Lab Dropbox\\Adrian Mladenić Grobelnik\\Areas\\Uni\\MLG\\MLG-Predicting-Impacful-Events\\graph_gen"
         },
         {
-            "name": "GNN Training",
+            "name": "GNN Training Surface",
             "type": "python",
             "request": "launch",
             "program": "train_gnn_llm.py",
             "console": "integratedTerminal",
             "justMyCode": True,
             "cwd": "C:\\Users\\Adrian\\AI Lab Dropbox\\Adrian Mladenić Grobelnik\\Areas\\Uni\\MLG\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
-            "args": ["--mode", "train"]
+            "args": [
+                "--mode",
+                "train"
+            ]
         },
         {
-            "name": "Hyperparameter tuning",
+            "name": "Hyperparameter tuning Surface",
             "type": "python",
             "request": "launch",
             "program": "train_gnn_llm.py",
             "console": "integratedTerminal",
             "justMyCode": True,
             "cwd": "C:\\Users\\Adrian\\AI Lab Dropbox\\Adrian Mladenić Grobelnik\\Areas\\Uni\\MLG\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
-            "args": ["--mode", "tune"]
-        }
+            "args": [
+                "--mode",
+                "tune"
+            ]
+        },
+        {
+            "name": "Hyperparameter tuning Nocturno",
+            "type": "python",
+            "request": "launch",
+            "program": "train_gnn_llm.py",
+            "console": "integratedTerminal",
+            "justMyCode": True,
+            "cwd": "D:\\Users\\Adrian\\AI Lab Dropbox\\Adrian Mladenić Grobelnik\\Areas\\Uni\\MLG\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
+            "args": [
+                "--mode",
+                "tune"
+            ]
+        },
+        {
+            "name": "GNN Training Nocturno",
+            "type": "python",
+            "request": "launch",
+            "program": "train_gnn_llm.py",
+            "console": "integratedTerminal",
+            "justMyCode": True,
+            "cwd": "D:\\Users\\Adrian\\AI Lab Dropbox\\Adrian Mladenić Grobelnik\\Areas\\Uni\\MLG\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
+            "args": [
+                "--mode",
+                "train"
+            ]
+        },
     ]
 }
