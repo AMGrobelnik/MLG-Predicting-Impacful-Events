@@ -21,12 +21,13 @@ from hetero_gnn import HeteroGNN
 
 train_args = {
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-    "hidden_size": 48,
+    "hidden_size": 64,
     "epochs": 200,
     "weight_decay": 0.0002930387278908051,
     "lr": 0.05091434725288385,
-    "attn_size": 32,
-    "num_layers": 3,
+    "attn_size": 64,
+    "num_layers": 4,
+    "aggr": "attn",
 }
 
 
@@ -215,6 +216,7 @@ def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
             "attn_size": 32,  # Fixed value
             "epochs": trial.suggest_int("epochs", 150, 300),
             "num_layers": trial.suggest_int("num_layers", 1, 10),
+            "aggr": trial.suggest_categorical("aggr", ["mean", "attn"]),
         },
     )
 
@@ -230,7 +232,7 @@ def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
             "device": train_args["device"],
         },
         num_layers=config.num_layers,
-        aggr="mean",
+        aggr=config.aggr,
     ).to(train_args["device"])
     optimizer = torch.optim.Adam(
         model.parameters(), lr=config.lr, weight_decay=config.weight_decay
@@ -260,7 +262,7 @@ def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
         if cur_tvt_scores[1] < best_tvt_scores[1]:
             best_tvt_scores = (cur_tvt_scores[0], cur_tvt_scores[1], cur_tvt_scores[2])
 
-    # Finish wandb run
+    # Finish wandb runf
     wandb.finish()
 
     # The objective value is the best validation score
@@ -289,7 +291,10 @@ def train_model(hetero_graph):
     best_tvt_scores = (float("inf"), float("inf"), float("inf"))
 
     model = HeteroGNN(
-        hetero_graph, train_args, num_layers=train_args["num_layers"], aggr="attn"
+        hetero_graph,
+        train_args,
+        num_layers=train_args["num_layers"],
+        aggr=train_args["aggr"],
     ).to(train_args["device"])
 
     train_idx, val_idx, test_idx = create_split(hetero_graph)
