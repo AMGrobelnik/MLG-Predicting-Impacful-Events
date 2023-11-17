@@ -1,0 +1,1 @@
+{"epoch": 244, "train_loss": 2319.353515625, "val_score": 28.34345054626465, "best_val_score": 28.34345054626465, "_timestamp": 1700232226.8215225, "_runtime": 25.78040337562561, "_step": 244, "_wandb": {"runtime": 23}}
