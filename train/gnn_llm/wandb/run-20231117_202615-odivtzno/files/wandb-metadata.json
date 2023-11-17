@@ -1,0 +1,56 @@
+{
+    "os": "Windows-10-10.0.22621-SP0",
+    "python": "3.10.12",
+    "heartbeatAt": "2023-11-17T19:26:17.496504",
+    "startedAt": "2023-11-17T19:26:15.521091",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--mode",
+        "tune"
+    ],
+    "state": "running",
+    "program": "D:\\Users\\Adrian\\AI Lab Dropbox\\Adrian Mladeni\u0107 Grobelnik\\Areas\\Uni\\MLG\\MLG-Predicting-Impacful-Events\\train\\gnn_llm\\train_gnn_llm.py",
+    "codePathLocal": "train_gnn_llm.py",
+    "codePath": "train\\gnn_llm\\train_gnn_llm.py",
+    "git": {
+        "remote": "https://github.com/AMGrobelnik/MLG-Predicting-Impacful-Events",
+        "commit": "c875d378f3ac9c001b94919755e4e6a357c3f585"
+    },
+    "email": "52002338+AMGrobelnik@users.noreply.github.com",
+    "root": "D:/Users/Adrian/AI Lab Dropbox/Adrian Mladeni\u0107 Grobelnik/Areas/Uni/MLG/MLG-Predicting-Impacful-Events",
+    "host": "Nocturno",
+    "username": "adria",
+    "executable": "C:\\Users\\adria\\anaconda3\\envs\\mlg\\python.exe",
+    "cpu_count": 6,
+    "cpu_count_logical": 12,
+    "cpu_freq": {
+        "current": 2712.0,
+        "min": 0.0,
+        "max": 2712.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2712.0,
+            "min": 0.0,
+            "max": 2712.0
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 953.7431602478027,
+            "used": 550.0234260559082
+        }
+    },
+    "gpu": "Quadro P2000",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "Quadro P2000",
+            "memory_total": 4294967296
+        }
+    ],
+    "memory": {
+        "total": 63.71686935424805
+    }
+}
