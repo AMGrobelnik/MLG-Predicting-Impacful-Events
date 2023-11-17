@@ -22,7 +22,7 @@ from hetero_gnn import HeteroGNN
 train_args = {
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     "hidden_size": 48,
-    "epochs": 500,
+    "epochs": 200,
     "weight_decay": 0.0002930387278908051,
     "lr": 0.05091434725288385,
     "attn_size": 32,
@@ -206,7 +206,7 @@ def display_results(best_model):
 def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
     # Initialize wandb run
     wandb.init(
-        project="V2_MLG_PredEvents_GNN+LMM",
+        project="V6_MLG_PredEvents_GNN+LMM",
         dir=None,
         config={
             "lr": trial.suggest_float("lr", 1e-5, 1e-1, log=True),
@@ -214,7 +214,7 @@ def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
             "hidden_size": trial.suggest_int("hidden_size", 16, 128),
             "attn_size": 32,  # Fixed value
             "epochs": trial.suggest_int("epochs", 150, 300),
-            "num_layers": trial.suggest_int("epochs", 1, 10),
+            "num_layers": trial.suggest_int("num_layers", 1, 10),
         },
     )
 
