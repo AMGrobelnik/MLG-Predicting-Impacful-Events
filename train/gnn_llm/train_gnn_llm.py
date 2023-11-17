@@ -26,6 +26,7 @@ train_args = {
     "weight_decay": 0.0002930387278908051,
     "lr": 0.05091434725288385,
     "attn_size": 32,
+    "num_layers": 3,
 }
 
 
@@ -157,7 +158,9 @@ def graph_tensors_to_device(hetero_graph):
 
     # Send node targets to device
     for key in hetero_graph.node_target:
-        hetero_graph.node_target[key] = hetero_graph.node_target[key].to(train_args["device"])
+        hetero_graph.node_target[key] = hetero_graph.node_target[key].to(
+            train_args["device"]
+        )
 
 
 def create_split(hetero_graph):
@@ -180,7 +183,9 @@ def create_split(hetero_graph):
         ),
     }
     test_idx = {
-        "event": torch.tensor(range(int(nEvents * s2), nEvents)).to(train_args["device"]),
+        "event": torch.tensor(range(int(nEvents * s2), nEvents)).to(
+            train_args["device"]
+        ),
         "concept": torch.tensor(range(int(nConcepts * s2), nConcepts)).to(
             train_args["device"]
         ),
@@ -202,13 +207,14 @@ def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
     # Initialize wandb run
     wandb.init(
         project="V2_MLG_PredEvents_GNN+LMM",
+        dir=None,
         config={
             "lr": trial.suggest_float("lr", 1e-5, 1e-1, log=True),
             "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True),
             "hidden_size": trial.suggest_int("hidden_size", 16, 128),
             "attn_size": 32,  # Fixed value
             "epochs": trial.suggest_int("epochs", 150, 300),
-            "num_layers": 2,  # Fixed value
+            "num_layers": trial.suggest_int("epochs", 1, 10),
         },
     )
 
@@ -282,7 +288,9 @@ def train_model(hetero_graph):
     best_model = None
     best_tvt_scores = (float("inf"), float("inf"), float("inf"))
 
-    model = HeteroGNN(hetero_graph, train_args, num_layers=2, aggr="attn").to(train_args["device"])
+    model = HeteroGNN(
+        hetero_graph, train_args, num_layers=train_args["num_layers"], aggr="attn"
+    ).to(train_args["device"])
 
     train_idx, val_idx, test_idx = create_split(hetero_graph)
 
