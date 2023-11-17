@@ -8,6 +8,7 @@
 #MLG PROJECT SPECIFIC
 /temp/
 /train/wandb/*
+/train/gnn_llm/wandb/*
 /train/gnn_llm/*.pkl
 
 # User-specific stuff
