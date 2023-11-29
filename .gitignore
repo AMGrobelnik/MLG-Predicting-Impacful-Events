@@ -18,6 +18,9 @@
 .idea/**/dictionaries
 .idea/**/shelf
 
+# Mac specific
+**/.DS_Store
+
 # AWS User-specific
 .idea/**/aws.xml
 
