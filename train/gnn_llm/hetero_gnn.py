@@ -147,10 +147,10 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
             return out
 
         elif self.aggr == "attn":
-            xs = torch.stack(xs, dim=0)
-            s = self.attn_proj(xs).squeeze(-1)
-            s = torch.mean(s, dim=-1)
-            self.alpha = torch.softmax(s, dim=0).detach()
+            xs = torch.stack(xs, dim=0) 
+            s = self.attn_proj(xs).squeeze(-1) # Pass the xs through the attention layer
+            s = torch.mean(s, dim=-1) # Average the attention scores across the source nodes
+            self.alpha = torch.softmax(s, dim=0).detach() # Compute the attention probability
             out = self.alpha.reshape(-1, 1, 1) * xs
             out = torch.sum(out, dim=0)
             return out
