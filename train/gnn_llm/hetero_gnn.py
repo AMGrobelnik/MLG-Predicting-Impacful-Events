@@ -27,6 +27,7 @@ train_args = {
     "aggr": "attn",
 }
 
+
 class HeteroGNNConv(pyg_nn.MessagePassing):
     def __init__(self, in_channels_src, in_channels_dst, out_channels):
         super(HeteroGNNConv, self).__init__(aggr="mean")
@@ -159,10 +160,16 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
             return out
 
         elif self.aggr == "attn":
-            xs = torch.stack(xs, dim=0) 
-            s = self.attn_proj(xs).squeeze(-1) # Pass the xs through the attention layer
-            s = torch.mean(s, dim=-1) # Average the attention scores across the source nodes
-            self.alpha = torch.softmax(s, dim=0).detach() # Compute the attention probability
+            xs = torch.stack(xs, dim=0)
+            s = self.attn_proj(xs).squeeze(
+                -1
+            )  # Pass the xs through the attention layer
+            s = torch.mean(
+                s, dim=-1
+            )  # Average the attention scores across the source nodes
+            self.alpha = torch.softmax(
+                s, dim=0
+            ).detach()  # Compute the attention probability
             out = self.alpha.reshape(-1, 1, 1) * xs
             out = torch.sum(out, dim=0)
             return out
@@ -204,45 +211,6 @@ def generate_convs(hetero_graph, conv, hidden_size, first_layer=False):
 
 
 class HeteroGNN(torch.nn.Module):
-    # def __init__(self, hetero_graph, args, num_layers, aggr="mean"):
-    #     super(HeteroGNN, self).__init__()
-
-    #     self.aggr = aggr
-    #     self.hidden_size = args["hidden_size"]
-
-    #     self.bns1 = nn.ModuleDict()
-    #     self.bns2 = nn.ModuleDict()
-    #     self.relus1 = nn.ModuleDict()
-    #     self.relus2 = nn.ModuleDict()
-    #     self.post_mps = nn.ModuleDict()
-    #     self.fc = nn.ModuleDict()
-
-    #     # Initialize the graph convolutional layers
-    #     self.convs1 = HeteroGNNWrapperConv(
-    #         generate_convs(
-    #             hetero_graph, HeteroGNNConv, self.hidden_size, first_layer=True
-    #         ),
-    #         args,
-    #         self.aggr,
-    #     )
-    #     self.convs2 = HeteroGNNWrapperConv(
-    #         generate_convs(
-    #             hetero_graph, HeteroGNNConv, self.hidden_size, first_layer=False
-    #         ),
-    #         args,
-    #         self.aggr,
-    #     )
-
-    #     # Initialize batch normalization, ReLU, and fully connected layers for each node type
-    #     all_node_types = hetero_graph.node_types
-    #     for node_type in all_node_types:
-    #         self.bns1[node_type] = nn.BatchNorm1d(self.hidden_size, eps=1.0)
-    #         self.bns2[node_type] = nn.BatchNorm1d(self.hidden_size, eps=1.0)
-
-    #         self.relus1[node_type] = nn.LeakyReLU()
-    #         self.relus2[node_type] = nn.LeakyReLU()
-    #         self.fc[node_type] = nn.Linear(self.hidden_size, 1)
-
     def __init__(self, hetero_graph, args, num_layers, aggr="mean"):
         super(HeteroGNN, self).__init__()
 
@@ -283,8 +251,8 @@ class HeteroGNN(torch.nn.Module):
         all_node_types = hetero_graph.node_types
         for i in range(self.num_layers):
             for node_type in all_node_types:
-                key_bn = f'bn_{i}_{node_type}'
-                key_relu = f'relu_{i}_{node_type}'
+                key_bn = f"bn_{i}_{node_type}"
+                key_relu = f"relu_{i}_{node_type}"
                 self.bns[key_bn] = nn.BatchNorm1d(self.hidden_size, eps=1.0)
                 self.relus[key_relu] = nn.LeakyReLU()
 
@@ -292,29 +260,6 @@ class HeteroGNN(torch.nn.Module):
         for node_type in all_node_types:
             self.fc[node_type] = nn.Linear(self.hidden_size, 1)
 
-    # def forward(self, node_feature, edge_index):
-    #     """
-    #     Forward pass of the model.
-
-    #     :param node_feature: Dictionary of node features for each node type.
-    #     :param edge_index: Dictionary of edge indices for each message type.
-    #     :return: The output embeddings for each node type after passing through the model.
-    #     """
-    #     x = node_feature
-
-    #     # Apply graph convolutional, batch normalization, and ReLU layers
-    #     x = self.convs1(x, edge_index)
-        #  x = forward_op(x, self.bns1)
-    #     x = forward_op(x, self.relus1)
-
-    #     x = self.convs2(x, edge_index)
-    #     x = forward_op(x, self.bns2)
-    #     x = forward_op(x, self.relus2)
-
-    #     x = forward_op(x, self.fc)
-    #     return x
-    
-    
     def forward(self, node_feature, edge_index):
         """
         Forward pass of the model.
@@ -329,9 +274,11 @@ class HeteroGNN(torch.nn.Module):
         for i in range(self.num_layers):
             x = self.convs[i](x, edge_index)  # Apply the i-th graph convolutional layer
             for node_type in x:
-                key_bn = f'bn_{i}_{node_type}'
-                key_relu = f'relu_{i}_{node_type}'
-                x[node_type] = self.bns[key_bn](x[node_type])  # Apply batch normalization
+                key_bn = f"bn_{i}_{node_type}"
+                key_relu = f"relu_{i}_{node_type}"
+                x[node_type] = self.bns[key_bn](
+                    x[node_type]
+                )  # Apply batch normalization
                 x[node_type] = self.relus[key_relu](x[node_type])  # Apply ReLU
 
         # Apply the final fully connected layers
@@ -339,7 +286,6 @@ class HeteroGNN(torch.nn.Module):
             x[node_type] = self.fc[node_type](x[node_type])
 
         return x
-    
 
     def loss(self, preds, y, indices):
         """
@@ -352,11 +298,13 @@ class HeteroGNN(torch.nn.Module):
         :return: The computed loss value.
         """
 
-        mape = MeanAbsolutePercentageError().to(train_args["device"])
+        # mape = MeanAbsolutePercentageError().to(train_args["device"])
 
         loss = 0
         loss_func = torch.nn.MSELoss()
-        loss_func = mape
+
+        # loss_func = mape
+        # MAPE PRODUCES BETTER EVAL RESULTS BUT WORSE PREDICTIONS
 
         mask = y["event"][indices["event"], 0] != -1
         non_zero_idx = torch.masked_select(indices["event"], mask)

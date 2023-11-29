@@ -21,12 +21,12 @@ from hetero_gnn import HeteroGNN
 
 train_args = {
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-    "hidden_size": 64,
-    "epochs": 200,
-    "weight_decay": 0.0002930387278908051,
-    "lr": 0.05091434725288385,
-    "attn_size": 64,
-    "num_layers": 3,
+    "hidden_size": 81,
+    "epochs": 233,
+    "weight_decay": 0.00002203762357664057,
+    "lr": 0.003873757421883433,
+    "attn_size": 48,
+    "num_layers": 6,
     "aggr": "attn",
 }
 
@@ -110,7 +110,8 @@ def test(model, graph, indices, best_model, best_tvt_scores):
         best_tvt_scores = tvt_scores
         # torch.to_pickle(model, 'best_model.pkl')
         # model.to_pickle('best_model.pkl')
-        best_model = copy.deepcopy(model)
+
+        # best_model = copy.deepcopy(model)
         torch.save(model.state_dict(), "./best_model.pkl")
 
     return tvt_scores, best_tvt_scores, best_model
@@ -205,6 +206,10 @@ def display_results(best_model):
 
 
 def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
+
+    aggr_method = trial.suggest_categorical("aggr", ["mean", "attn"])
+    attn_size = trial.suggest_int("attn_size", 16, 128) if aggr_method == "attn" else 32
+
     # Initialize wandb run
     wandb.init(
         project="V6_MLG_PredEvents_GNN+LMM",
@@ -214,10 +219,10 @@ def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
             "lr": trial.suggest_float("lr", 1e-5, 1e-1, log=True),
             "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True),
             "hidden_size": trial.suggest_int("hidden_size", 16, 128),
-            "attn_size": 32,  # Fixed value
+            "attn_size": attn_size,  # Fixed value
             "epochs": trial.suggest_int("epochs", 150, 300),
             "num_layers": trial.suggest_int("num_layers", 1, 10),
-            "aggr": trial.suggest_categorical("aggr", ["mean", "attn"]),
+            "aggr": aggr_method,
         },
     )
 
@@ -247,6 +252,10 @@ def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
         train_loss = train(model, optimizer, hetero_graph, train_idx)
         cur_tvt_scores, best_tvt_scores, _ = test(
             model, hetero_graph, [train_idx, val_idx, test_idx], None, best_tvt_scores
+        )
+
+        print(
+            f"Epoch {epoch} Loss {train_loss:.4f} Current Train,Val,Test Scores {[score.item() for score in cur_tvt_scores]}"
         )
 
         # Log metrics to wandb
@@ -321,14 +330,11 @@ def train_model(hetero_graph):
 
     print("Best Train,Val,Test Scores", [score.item() for score in best_tvt_scores])
 
-    model = HeteroGNN(hetero_graph, train_args, num_layers=train_args["num_layers"], aggr="attn").to(
-        train_args["device"]
-    )
-    
-    
+    model = HeteroGNN(
+        hetero_graph, train_args, num_layers=train_args["num_layers"], aggr=train_args["aggr"]
+    ).to(train_args["device"])
+
     model.load_state_dict(torch.load("./best_model.pkl"))
-    
-    
 
     preds = model(hetero_graph.node_feature, hetero_graph.edge_index)
 
