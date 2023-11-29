@@ -165,12 +165,9 @@ def prune_disconnected(graph: nx.Graph):
     """
     Removes all nodes that are not connected to any other node
     """
-    nodes_to_remove = []
-    for node in tqdm(graph.nodes(), desc="Removing disconnected nodes", ncols=100):
-        if graph.degree(node) == 0:
-            nodes_to_remove.append(node)
-    graph.remove_nodes_from(nodes_to_remove)
-    tqdm.write(f"Removed {len(nodes_to_remove)} disconnected nodes")
+    isolates = list(nx.isolates(graph))
+    graph.remove_nodes_from(isolates)
+    tqdm.write(f"Removed {len(isolates)} disconnected nodes")
 
 
 def remove_future_edges(graph: nx.Graph, threshold: int):
@@ -184,12 +181,10 @@ def remove_future_edges(graph: nx.Graph, threshold: int):
         d1 = graph.nodes[u]["node_feature"][0]
         d2 = graph.nodes[v]["node_feature"][0]
 
-        # simultaneous events are not removed
-        if abs(d1 - d2) <= threshold:
-            continue
-
-        # remove the edge if it points to the past
-        if d1 < d2:
+        # remove the edge if
+        # - it points to the past
+        # - they happen at the same time (or within the threshold)
+        if d1 < d2 or abs(d1 - d2) <= threshold:
             to_remove.append((u, v))
 
     graph.remove_edges_from(to_remove)
