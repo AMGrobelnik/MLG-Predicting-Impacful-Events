@@ -25,7 +25,7 @@
             "program": "train_gnn_llm.py",
             "console": "integratedTerminal",
             "justMyCode": True,
-            "cwd": "C:\\Users\\Adrian\\AI Lab Dropbox\\Adrian Mladenic Grobelnik\\Areas\\Uni\\MLG\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
+            "cwd": "C:\\Users\\Adrian\\Desktop\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
             "args": [
                 "--mode",
                 "train"
@@ -38,7 +38,7 @@
             "program": "train_gnn_llm.py",
             "console": "integratedTerminal",
             "justMyCode": True,
-            "cwd": "C:\\Users\\Adrian\\AI Lab Dropbox\\Adrian Mladenic Grobelnik\\Areas\\Uni\\MLG\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
+            "cwd": "C:\\Users\\Adrian\\Desktop\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
             "args": [
                 "--mode",
                 "tune"

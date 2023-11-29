@@ -26,7 +26,7 @@ train_args = {
     "weight_decay": 0.0002930387278908051,
     "lr": 0.05091434725288385,
     "attn_size": 64,
-    "num_layers": 4,
+    "num_layers": 3,
     "aggr": "attn",
 }
 
@@ -110,7 +110,7 @@ def test(model, graph, indices, best_model, best_tvt_scores):
         best_tvt_scores = tvt_scores
         # torch.to_pickle(model, 'best_model.pkl')
         # model.to_pickle('best_model.pkl')
-        # best_model = copy.deepcopy(model)
+        best_model = copy.deepcopy(model)
         torch.save(model.state_dict(), "./best_model.pkl")
 
     return tvt_scores, best_tvt_scores, best_model
@@ -320,8 +320,15 @@ def train_model(hetero_graph):
 
     print("Best Train,Val,Test Scores", [score.item() for score in best_tvt_scores])
 
-    model = HeteroGNN(hetero_graph, train_args, num_layers=2, aggr="attn").to(train_args['device'])
-    model.load_state_dict(torch.load('./best_model.pkl'))
+    model = HeteroGNN(hetero_graph, train_args, num_layers=train_args["num_layers"], aggr="attn").to(
+        train_args["device"]
+    )
+    
+    
+    model.load_state_dict(torch.load("./best_model.pkl"))
+    
+    
+
     preds = model(hetero_graph.node_feature, hetero_graph.edge_index)
 
     cur_tvt_scores, best_tvt_scores, best_model = test(
