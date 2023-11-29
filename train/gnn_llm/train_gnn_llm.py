@@ -208,6 +208,7 @@ def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
     # Initialize wandb run
     wandb.init(
         project="V6_MLG_PredEvents_GNN+LMM",
+        entity="mlg-events",
         dir=None,
         config={
             "lr": trial.suggest_float("lr", 1e-5, 1e-1, log=True),
@@ -320,8 +321,10 @@ def train_model(hetero_graph):
 
     print("Best Train,Val,Test Scores", [score.item() for score in best_tvt_scores])
 
-    model = HeteroGNN(hetero_graph, train_args, num_layers=2, aggr="attn").to(train_args['device'])
-    model.load_state_dict(torch.load('./best_model.pkl'))
+    model = HeteroGNN(hetero_graph, train_args, num_layers=2, aggr="attn").to(
+        train_args["device"]
+    )
+    model.load_state_dict(torch.load("./best_model.pkl"))
     preds = model(hetero_graph.node_feature, hetero_graph.edge_index)
 
     cur_tvt_scores, best_tvt_scores, best_model = test(
