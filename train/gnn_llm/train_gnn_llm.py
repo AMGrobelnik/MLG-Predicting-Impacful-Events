@@ -213,6 +213,7 @@ def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
     # Initialize wandb run
     wandb.init(
         project="V6_MLG_PredEvents_GNN+LMM",
+        entity="mlg-events",
         dir=None,
         config={
             "lr": trial.suggest_float("lr", 1e-5, 1e-1, log=True),
