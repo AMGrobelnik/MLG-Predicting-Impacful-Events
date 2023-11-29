@@ -2,6 +2,7 @@ source/*
 preprocessed/*
 graphs/*
 text/*
+postprocess/*
 
 # Don't ignore .gitkeep files
 !.gitkeep

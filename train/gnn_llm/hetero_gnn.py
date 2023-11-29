@@ -10,10 +10,22 @@ from sklearn.metrics import f1_score
 from deepsnap.hetero_gnn import forward_op
 from deepsnap.hetero_graph import HeteroGraph
 from torch_sparse import SparseTensor, matmul
+from torchmetrics.regression import MeanAbsolutePercentageError
+
 
 import pickle
 import networkx as nx
 
+train_args = {
+    "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    "hidden_size": 64,
+    "epochs": 200,
+    "weight_decay": 0.0002930387278908051,
+    "lr": 0.05091434725288385,
+    "attn_size": 64,
+    "num_layers": 4,
+    "aggr": "attn",
+}
 
 class HeteroGNNConv(pyg_nn.MessagePassing):
     def __init__(self, in_channels_src, in_channels_dst, out_channels):
@@ -340,8 +352,11 @@ class HeteroGNN(torch.nn.Module):
         :return: The computed loss value.
         """
 
+        mape = MeanAbsolutePercentageError().to(train_args["device"])
+
         loss = 0
         loss_func = torch.nn.MSELoss()
+        loss_func = mape
 
         mask = y["event"][indices["event"], 0] != -1
         non_zero_idx = torch.masked_select(indices["event"], mask)
