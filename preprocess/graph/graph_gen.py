@@ -21,32 +21,36 @@ def get_file_names(count: int, directory="../../data/preprocessed/") -> List[str
 
 
 def get_event_attributes(
-    event: dict, similar_event: bool, df_llm: pd.DataFrame = None
+    event: dict, is_similar: bool, df_llm: pd.DataFrame = None
 ) -> dict:
     """
     Generates a dictionary of features for a given event
     :param df_llm: DataFrame containing the LLM embeddings
     :param event: the event to generate features for
-    :param similar_event: whether the event is a similar event (and does not have all the attributes)
+    :param is_similar: whether the event is a similar event (and does not have all the attributes)
     """
     global remove_future, cheat
 
-    uri = event["info"]["uri"] if not similar_event else event["uri"]
-    article_count = -1 if similar_event else event["info"]["articleCounts"]["total"]
-    event_date = event["eventDate"] if similar_event else event["info"]["eventDate"]
+    uri = event["info"]["uri"] if not is_similar else event["uri"]
+    article_count = -1 if is_similar else event["info"]["articleCounts"]["total"]
+    event_date = event["eventDate"] if is_similar else event["info"]["eventDate"]
 
     feature_tensor = torch.tensor([event_date], dtype=torch.float32)
     if df_llm is not None:
         if uri in df_llm.index:
             llm = df_llm.loc[uri]
-            # title = torch.tensor(llm["title_embed"], dtype=torch.float32)
-            summary = torch.tensor(llm["summary_embed"], dtype=torch.float32)
+            # title = torch.tensor(llm["title"], dtype=torch.float32)
+            summary = torch.tensor(llm["summary"], dtype=torch.float32)
             feature_tensor = torch.cat((feature_tensor, summary))  # title
         else:
+            if not is_similar:
+                tqdm.write(f"WARNING: LLM not found for {uri}")
             feature_tensor = torch.cat((feature_tensor, torch.zeros(768 * 1)))
 
     if remove_future or cheat:  # TODO: hide the article_count from train data
-        feature_tensor = torch.cat((torch.tensor([article_count], dtype=torch.float32), feature_tensor))
+        feature_tensor = torch.cat(
+            (torch.tensor([article_count], dtype=torch.float32), feature_tensor)
+        )
 
     return {
         "node_type": "event",
@@ -78,13 +82,24 @@ def get_concepts(event_id: str, concepts: dict):
     return nodes, edges
 
 
-def get_similar_events(event_id: str, similar_events: dict, llm_df: pd.DataFrame = None):
-    nodes = [(se["uri"], get_event_attributes(se, True, llm_df))
-             for se in similar_events]
-    edges = [(event_id, se["uri"], {"edge_type": "similar", "weight": se["sim"]})
-             for se in similar_events]
+def get_similar_events(
+    event_id: str, similar_events: dict, llm_df: pd.DataFrame = None
+):
+    nodes = [
+        (se["uri"], get_event_attributes(se, True, llm_df)) for se in similar_events
+    ]
+    edges = [
+        (event_id, se["uri"], {"edge_type": "similar", "weight": se["sim"]})
+        for se in similar_events
+    ]
 
     return nodes, edges
+
+
+def load_llm_embeddings(file: str):
+    file_name = file.split("/")[-1]
+    df = pd.read_pickle(f"../../data/text/embedded/{file_name}")
+    return df
 
 
 def generate_graph(
@@ -102,13 +117,10 @@ def generate_graph(
     :return:
     """
     G = nx.Graph()
-    df_llm = None
-    if include_llm_embeddings:
-        df_llm = pd.read_pickle("../../data/text/llm_embeddings.pkl")
-
     if include_similar_events:
         for file in tqdm(files, desc="Adding similar events", ncols=100):
             df = pd.read_pickle(file)
+            df_llm = load_llm_embeddings(file)
             for _, event in df.iterrows():
                 info, similar_events = event["info"], event["similarEvents"]
                 event_id = info["uri"]
@@ -122,6 +134,7 @@ def generate_graph(
     # Add event data last to avoid overwriting
     for file in tqdm(files, desc="Adding event data", ncols=100):
         df = pd.read_pickle(file)
+        df_llm = load_llm_embeddings(file)
         for _, event in df.iterrows():
             event_id = event["info"]["uri"]
             G.add_node(event_id, **get_event_attributes(event, False, df_llm))
@@ -183,7 +196,7 @@ def remove_future_edges(graph: nx.Graph, threshold: int):
 
         # remove the edge if
         # - it points to the past
-        # - they happen at the same time (or within the threshold)
+        # - they happen at the same time (i.e. within the threshold)
         if d1 < d2 or abs(d1 - d2) <= threshold:
             to_remove.append((u, v))
 
@@ -196,7 +209,9 @@ def remove_unknown_events(graph: nx.Graph):
     Removes all events that do not have a target
     """
     to_remove = []
-    for node, data in tqdm(graph.nodes(data=True), desc="Removing unknown events", ncols=100):
+    for node, data in tqdm(
+        graph.nodes(data=True), desc="Removing unknown events", ncols=100
+    ):
         if data["node_type"] != "event":
             continue
         if data["node_target"][0] == -1:
@@ -213,8 +228,20 @@ def print_graph_statistics(graph: nx.Graph):
     edge_c = graph.number_of_edges()
     concepts = len([n for n in graph.nodes() if n.startswith("c")])
     events = len([n for n in graph.nodes() if n.startswith("e")])
-    concept_edges = len([data for _, _, data in graph.edges(data=True) if data["edge_type"] == "related"])
-    event_edges = len([data for _, _, data in graph.edges(data=True) if data["edge_type"] == "similar"])
+    concept_edges = len(
+        [
+            data
+            for _, _, data in graph.edges(data=True)
+            if data["edge_type"] == "related"
+        ]
+    )
+    event_edges = len(
+        [
+            data
+            for _, _, data in graph.edges(data=True)
+            if data["edge_type"] == "similar"
+        ]
+    )
     counts = 0
     for _, data in graph.nodes(data=True):
         if data["node_type"] == "event":
@@ -237,16 +264,16 @@ def print_graph_statistics(graph: nx.Graph):
     )
 
 
-n = 5
+n = 1000
 concepts = True
 similar = True
 llm_embeddings = True
 cheat = False  # include article counts in the node features
 
 remove_unknown = False
+remove_isolates = True
 remove_future = False
-future_threshold = 0
-
+future_threshold = 2
 
 if __name__ == "__main__":
     files = get_file_names(n)
@@ -256,23 +283,24 @@ if __name__ == "__main__":
     if remove_unknown:
         remove_unknown_events(graph)  # TODO: Maybe keep the edges
 
-    for i in tqdm([1], desc="To directed", ncols=100):
-        graph = graph.to_directed()
+    tqdm.write("Converting to directed graph")
+    graph = nx.DiGraph(graph)
 
     if remove_future:
         remove_future_edges(graph, future_threshold)
+    if remove_isolates:
+        prune_disconnected(graph)
 
-    # prune_disconnected(graph)
     add_concept_degree(graph)
 
-    for i in tqdm([1], desc="Saving graph", ncols=100):
-        name = f"{n}"
-        name += "_concepts" if concepts else ""
-        name += "_similar" if similar else ""
-        name += "_llm" if llm_embeddings else ""
-        name += "_noFuture" if remove_future else ""
-        name += "_noUnknown" if remove_unknown else ""
-        name += "_CHEAT" if cheat else ""
-        save_graph(graph, name)
+    name = f"{n}"
+    name += "_concepts" if concepts else ""
+    name += "_similar" if similar else ""
+    name += "_llm" if llm_embeddings else ""
+    name += f"_noFutureThr{future_threshold}" if remove_future else ""
+    name += "_noUnknown" if remove_unknown else ""
+    name += "_noIsolates" if remove_isolates else ""
+    name += "_CHEAT" if cheat else ""
+    save_graph(graph, name)
 
     print_graph_statistics(graph)
