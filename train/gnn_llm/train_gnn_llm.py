@@ -320,6 +320,25 @@ def train_model(hetero_graph):
 
     print("Best Train,Val,Test Scores", [score.item() for score in best_tvt_scores])
 
+    model = HeteroGNN(hetero_graph, train_args, num_layers=2, aggr="attn").to(train_args['device'])
+    model.load_state_dict(torch.load('./best_model.pkl'))
+    preds = model(hetero_graph.node_feature, hetero_graph.edge_index)
+
+    cur_tvt_scores, best_tvt_scores, best_model = test(
+        model, hetero_graph, [train_idx, val_idx, test_idx], best_model, best_tvt_scores
+    )
+
+    display_predictions(preds, hetero_graph, test_idx)
+
+
+def display_predictions(preds, hetero_graph, test_idx):
+    for i in range(1000):
+        if hetero_graph.node_target["event"][test_idx["event"]][i] != -1:
+            print(
+                preds["event"][test_idx["event"]][i],
+                hetero_graph.node_target["event"][test_idx["event"]][i],
+            )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
