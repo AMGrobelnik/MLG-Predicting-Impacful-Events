@@ -26,7 +26,7 @@ train_args = {
     "weight_decay": 0.0002930387278908051,
     "lr": 0.05091434725288385,
     "attn_size": 64,
-    "num_layers": 3,
+    "num_layers": 4,
     "aggr": "attn",
 }
 
@@ -103,10 +103,18 @@ def test(model, graph, indices, best_model, best_tvt_scores):
             / non_zero_idx.shape[0]
         )
 
-        tvt_scores.append(L1)
+        meanRelative = (
+            torch.sum(
+                torch.abs(
+                    (preds["event"][non_zero_idx]-graph.node_target["event"][non_zero_idx])/graph.node_target["event"][non_zero_idx]
+                )
+            ) / non_zero_idx.shape[0]
+        )
+
+        tvt_scores.append((L1, meanRelative))
 
     # Update the best model and validation loss if the current model performs better
-    if tvt_scores[1] < best_tvt_scores[1]:
+    if tvt_scores[1][0] < best_tvt_scores[1][0]:
         best_tvt_scores = tvt_scores
         # torch.to_pickle(model, 'best_model.pkl')
         # model.to_pickle('best_model.pkl')
@@ -192,10 +200,6 @@ def create_split(hetero_graph):
         ),
     }
 
-    print(train_idx["event"].shape)
-    print(test_idx["event"].shape)
-    print(val_idx["event"].shape)
-
     return [train_idx, val_idx, test_idx]
 
 
@@ -260,7 +264,7 @@ def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
         )
 
         # Update the best validation score
-        if cur_tvt_scores[1] < best_tvt_scores[1]:
+        if cur_tvt_scores[1][0] < best_tvt_scores[1][0]:
             best_tvt_scores = (cur_tvt_scores[0], cur_tvt_scores[1], cur_tvt_scores[2])
 
     # Finish wandb runf
@@ -289,7 +293,7 @@ def hyper_parameter_tuning(hetero_graph):
 
 def train_model(hetero_graph):
     best_model = None
-    best_tvt_scores = (float("inf"), float("inf"), float("inf"))
+    best_tvt_scores = ((float("inf"), float("inf")), (float("inf"), float("inf")), (float("inf"), float("inf")))
 
     model = HeteroGNN(
         hetero_graph,
@@ -316,19 +320,24 @@ def train_model(hetero_graph):
             best_tvt_scores,
         )
         print(
-            f"Epoch {epoch} Loss {loss:.4f} Current Train,Val,Test Scores {[score.item() for score in cur_tvt_scores]}"
+            f"""Epoch: {epoch} Loss: {loss:.4f}
+            Train: Abs={cur_tvt_scores[0][0].item():.4f} Rel={cur_tvt_scores[0][1].item():.4f}
+            Val: Abs={cur_tvt_scores[1][0].item():.4f} Rel={cur_tvt_scores[1][1].item():.4f}
+            Test: Abs={cur_tvt_scores[2][0].item():.4f} Rel={cur_tvt_scores[2][1].item():.4f}"""
         )
 
-    print("Best Train,Val,Test Scores", [score.item() for score in best_tvt_scores])
+    print(
+            f"""Best model
+            Train: Abs={best_tvt_scores[0][0].item():.4f} Rel={best_tvt_scores[0][1].item():.4f}
+            Val: Abs={best_tvt_scores[1][0].item():.4f} Rel={best_tvt_scores[1][1].item():.4f}
+            Test: Abs={best_tvt_scores[2][0].item():.4f} Rel={best_tvt_scores[2][1].item():.4f}"""
+        )
 
     model = HeteroGNN(hetero_graph, train_args, num_layers=train_args["num_layers"], aggr="attn").to(
         train_args["device"]
     )
     
-    
     model.load_state_dict(torch.load("./best_model.pkl"))
-    
-    
 
     preds = model(hetero_graph.node_feature, hetero_graph.edge_index)
 

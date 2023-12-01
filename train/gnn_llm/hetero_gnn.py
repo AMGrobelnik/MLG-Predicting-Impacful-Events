@@ -1,9 +1,6 @@
-import copy
 import torch
 import deepsnap
-import numpy as np
 import torch.nn as nn
-import torch.nn.functional as F
 import torch_geometric.nn as pyg_nn
 
 from sklearn.metrics import f1_score
@@ -12,9 +9,6 @@ from deepsnap.hetero_graph import HeteroGraph
 from torch_sparse import SparseTensor, matmul
 from torchmetrics.regression import MeanAbsolutePercentageError
 
-
-import pickle
-import networkx as nx
 
 train_args = {
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -166,6 +160,8 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
             out = self.alpha.reshape(-1, 1, 1) * xs
             out = torch.sum(out, dim=0)
             return out
+        
+        raise ValueError(f"Invalid aggr {self.aggr}, valid options: (mean, attn)")
 
 
 def generate_convs(hetero_graph, conv, hidden_size, first_layer=False):
@@ -356,7 +352,7 @@ class HeteroGNN(torch.nn.Module):
 
         loss = 0
         loss_func = torch.nn.MSELoss()
-        loss_func = mape
+        # loss_func = mape
 
         mask = y["event"][indices["event"], 0] != -1
         non_zero_idx = torch.masked_select(indices["event"], mask)
