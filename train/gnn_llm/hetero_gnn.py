@@ -211,18 +211,19 @@ def generate_convs(hetero_graph, conv, hidden_size, first_layer=False):
 
 
 class HeteroGNN(torch.nn.Module):
-    def __init__(self, hetero_graph, args, num_layers, aggr="mean"):
+    def __init__(self, hetero_graph, args, num_layers, aggr="mean", return_embedding=False):
         super(HeteroGNN, self).__init__()
 
         self.aggr = aggr
         self.hidden_size = args["hidden_size"]
         self.num_layers = num_layers
+        self.return_embedding = return_embedding
 
         # Use a single ModuleDict for batch normalization and ReLU layers
         self.bns = nn.ModuleDict()
         self.relus = nn.ModuleDict()
         self.convs = nn.ModuleList()
-        self.fc = nn.ModuleDict()
+        self.fc = nn.ModuleDict()  # Prediction heads
 
         # Initialize the first graph convolutional layer
         self.convs.append(
@@ -281,7 +282,10 @@ class HeteroGNN(torch.nn.Module):
                 )  # Apply batch normalization
                 x[node_type] = self.relus[key_relu](x[node_type])  # Apply ReLU
 
-        # Apply the final fully connected layers
+        if self.return_embedding:
+            return x
+
+        # Apply the prediction head (linear layer)
         for node_type in x:
             x[node_type] = self.fc[node_type](x[node_type])
 
