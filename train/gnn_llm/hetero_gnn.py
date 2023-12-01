@@ -3,6 +3,7 @@ import deepsnap
 import torch.nn as nn
 import torch_geometric.nn as pyg_nn
 from torch_sparse import matmul
+from torchmetrics.regression import MeanAbsolutePercentageError
 
 train_args = {
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -149,7 +150,7 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
             out = self.alpha.reshape(-1, 1, 1) * xs
             out = torch.sum(out, dim=0)
             return out
-        
+
         raise ValueError(f"Invalid aggr {self.aggr}, valid options: (mean, attn)")
 
 
@@ -189,7 +190,9 @@ def generate_convs(hetero_graph, conv, hidden_size, first_layer=False):
 
 
 class HeteroGNN(torch.nn.Module):
-    def __init__(self, hetero_graph, args, num_layers, aggr="mean", return_embedding=False):
+    def __init__(
+        self, hetero_graph, args, num_layers, aggr="mean", return_embedding=False
+    ):
         super(HeteroGNN, self).__init__()
 
         self.aggr = aggr
@@ -206,9 +209,12 @@ class HeteroGNN(torch.nn.Module):
         # Initialize graph convolutional layers for each layer and message type
         for i in range(self.num_layers):
             conv = HeteroGNNWrapperConv(
-                    generate_convs(hetero_graph, HeteroGNNConv, self.hidden_size, first_layer=i is 0),
-                    args,
-                    self.aggr)
+                generate_convs(
+                    hetero_graph, HeteroGNNConv, self.hidden_size, first_layer=i is 0
+                ),
+                args,
+                self.aggr,
+            )
             self.convs.append(conv)
 
         # Initialize batch normalization and ReLU layers for each layer and node type

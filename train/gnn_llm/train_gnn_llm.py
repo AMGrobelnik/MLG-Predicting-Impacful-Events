@@ -25,7 +25,7 @@ train_args = {
     "epochs": 233,
     "weight_decay": 0.00002203762357664057,
     "lr": 0.003873757421883433,
-    "attn_size": 48,
+    "attn_size": 32,
     "num_layers": 6,
     "aggr": "attn",
 }
@@ -317,7 +317,7 @@ def train_model(hetero_graph):
         train_args,
         num_layers=train_args["num_layers"],
         aggr=train_args["aggr"],
-        return_embedding=True,
+        return_embedding=False,
     ).to(train_args["device"])
 
     train_idx, val_idx, test_idx = create_split(hetero_graph)
@@ -392,7 +392,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load the heterogeneous graph data
-    with open("./1_concepts_similar_llm.pkl", "rb") as f:
+    with open("./1_concepts_similar_llm_noIsolates.pkl", "rb") as f:
         G = pickle.load(f)
 
     # Create a HeteroGraph object from the networkx graph
