@@ -106,9 +106,14 @@ def test(model, graph, indices, best_model, best_tvt_scores):
         meanRelative = (
             torch.sum(
                 torch.abs(
-                    (preds["event"][non_zero_idx]-graph.node_target["event"][non_zero_idx])/graph.node_target["event"][non_zero_idx]
+                    (
+                        preds["event"][non_zero_idx]
+                        - graph.node_target["event"][non_zero_idx]
+                    )
+                    / graph.node_target["event"][non_zero_idx]
                 )
-            ) / non_zero_idx.shape[0]
+            )
+            / non_zero_idx.shape[0]
         )
 
         tvt_scores.append((L1, meanRelative))
@@ -301,13 +306,18 @@ def hyper_parameter_tuning(hetero_graph):
 
 def train_model(hetero_graph):
     best_model = None
-    best_tvt_scores = ((float("inf"), float("inf")), (float("inf"), float("inf")), (float("inf"), float("inf")))
+    best_tvt_scores = (
+        (float("inf"), float("inf")),
+        (float("inf"), float("inf")),
+        (float("inf"), float("inf")),
+    )
 
     model = HeteroGNN(
         hetero_graph,
         train_args,
         num_layers=train_args["num_layers"],
         aggr=train_args["aggr"],
+        return_embedding=True,
     ).to(train_args["device"])
 
     train_idx, val_idx, test_idx = create_split(hetero_graph)
@@ -335,11 +345,11 @@ def train_model(hetero_graph):
         )
 
     print(
-            f"""Best model
+        f"""Best model
             Train: Abs={best_tvt_scores[0][0].item():.4f} Rel={best_tvt_scores[0][1].item():.4f}
             Val: Abs={best_tvt_scores[1][0].item():.4f} Rel={best_tvt_scores[1][1].item():.4f}
             Test: Abs={best_tvt_scores[2][0].item():.4f} Rel={best_tvt_scores[2][1].item():.4f}"""
-        )
+    )
 
     model = HeteroGNN(
         hetero_graph,
