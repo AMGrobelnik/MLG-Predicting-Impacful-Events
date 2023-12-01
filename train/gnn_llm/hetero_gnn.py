@@ -2,13 +2,7 @@ import torch
 import deepsnap
 import torch.nn as nn
 import torch_geometric.nn as pyg_nn
-
-from sklearn.metrics import f1_score
-from deepsnap.hetero_gnn import forward_op
-from deepsnap.hetero_graph import HeteroGraph
-from torch_sparse import SparseTensor, matmul
-from torchmetrics.regression import MeanAbsolutePercentageError
-
+from torch_sparse import matmul
 
 train_args = {
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -29,11 +23,6 @@ class HeteroGNNConv(pyg_nn.MessagePassing):
         self.in_channels_src = in_channels_src
         self.in_channels_dst = in_channels_dst
         self.out_channels = out_channels
-
-        self.lin_dst = None
-        self.lin_src = None
-
-        self.lin_update = None
 
         self.lin_dst = nn.Linear(in_channels_dst, out_channels)
         self.lin_src = nn.Linear(in_channels_src, out_channels)
@@ -82,9 +71,6 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
         super(HeteroGNNWrapperConv, self).__init__(convs, None)
         self.aggr = aggr
 
-        # Map the index and message type
-        self.mapping = {}
-
         # A numpy array that stores the final attention probability
         self.alpha = None
 
@@ -125,12 +111,8 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
             )
 
         node_emb = {dst: [] for _, _, dst in message_type_emb.keys()}
-        mapping = {}
-
         for (src, edge_type, dst), item in message_type_emb.items():
-            mapping[len(node_emb[dst])] = (src, edge_type, dst)
             node_emb[dst].append(item)
-        self.mapping = mapping
 
         for node_type, embs in node_emb.items():
             if len(embs) == 1:
@@ -221,28 +203,13 @@ class HeteroGNN(torch.nn.Module):
         self.convs = nn.ModuleList()
         self.fc = nn.ModuleDict()  # Prediction heads
 
-        # Initialize the first graph convolutional layer
-        self.convs.append(
-            HeteroGNNWrapperConv(
-                generate_convs(
-                    hetero_graph, HeteroGNNConv, self.hidden_size, first_layer=True
-                ),
-                args,
-                self.aggr,
-            )
-        )
-
-        # Initialize the rest of the graph convolutional layers
-        for _ in range(1, self.num_layers):
-            self.convs.append(
-                HeteroGNNWrapperConv(
-                    generate_convs(
-                        hetero_graph, HeteroGNNConv, self.hidden_size, first_layer=False
-                    ),
+        # Initialize graph convolutional layers for each layer and message type
+        for i in range(self.num_layers):
+            conv = HeteroGNNWrapperConv(
+                    generate_convs(hetero_graph, HeteroGNNConv, self.hidden_size, first_layer=i is 0),
                     args,
-                    self.aggr,
-                )
-            )
+                    self.aggr)
+            self.convs.append(conv)
 
         # Initialize batch normalization and ReLU layers for each layer and node type
         all_node_types = hetero_graph.node_types
