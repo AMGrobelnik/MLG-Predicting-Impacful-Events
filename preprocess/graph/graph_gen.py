@@ -29,7 +29,7 @@ def get_event_attributes(
     :param event: the event to generate features for
     :param is_similar: whether the event is a similar event (and does not have all the attributes)
     """
-    global remove_future, cheat
+    global remove_future, count_feature
 
     uri = event["info"]["uri"] if not is_similar else event["uri"]
     article_count = -1 if is_similar else event["info"]["articleCounts"]["total"]
@@ -47,7 +47,7 @@ def get_event_attributes(
                 tqdm.write(f"WARNING: LLM not found for {uri}")
             feature_tensor = torch.cat((feature_tensor, torch.zeros(768 * 1)))
 
-    if remove_future or cheat:  # TODO: hide the article_count from train data
+    if count_feature:
         feature_tensor = torch.cat(
             (torch.tensor([article_count], dtype=torch.float32), feature_tensor)
         )
@@ -264,16 +264,16 @@ def print_graph_statistics(graph: nx.Graph):
     )
 
 
-n = 1000
+n = 1
 concepts = True
 similar = True
 llm_embeddings = True
-cheat = False  # include article counts in the node features
 
-remove_unknown = False
 remove_isolates = True
-remove_future = False
+remove_future = True
 future_threshold = 2
+count_feature = False  # include article counts in the node features
+remove_unknown = False
 
 if __name__ == "__main__":
     files = get_file_names(n)
@@ -300,7 +300,7 @@ if __name__ == "__main__":
     name += f"_noFutureThr{future_threshold}" if remove_future else ""
     name += "_noUnknown" if remove_unknown else ""
     name += "_noIsolates" if remove_isolates else ""
-    name += "_CHEAT" if cheat else ""
+    name += "_withCounts" if count_feature else ""
     save_graph(graph, name)
 
     print_graph_statistics(graph)
