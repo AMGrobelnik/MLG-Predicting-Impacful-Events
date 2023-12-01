@@ -206,7 +206,6 @@ def display_results(best_model):
 
 
 def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
-
     aggr_method = trial.suggest_categorical("aggr", ["mean", "attn"])
     attn_size = trial.suggest_int("attn_size", 16, 128) if aggr_method == "attn" else 32
 
@@ -331,7 +330,10 @@ def train_model(hetero_graph):
     print("Best Train,Val,Test Scores", [score.item() for score in best_tvt_scores])
 
     model = HeteroGNN(
-        hetero_graph, train_args, num_layers=train_args["num_layers"], aggr=train_args["aggr"]
+        hetero_graph,
+        train_args,
+        num_layers=train_args["num_layers"],
+        aggr=train_args["aggr"],
     ).to(train_args["device"])
 
     model.load_state_dict(torch.load("./best_model.pkl"))
@@ -346,9 +348,10 @@ def train_model(hetero_graph):
 
 
 def display_predictions(preds, hetero_graph, test_idx):
-    for i in range(1000):
+    for i in range(test_idx["event"].shape[0]):
         if hetero_graph.node_target["event"][test_idx["event"]][i] != -1:
             print(
+                i,
                 preds["event"][test_idx["event"]][i],
                 hetero_graph.node_target["event"][test_idx["event"]][i],
             )
