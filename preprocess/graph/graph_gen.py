@@ -162,16 +162,25 @@ def save_graph(graph: nx.Graph, name: str, directory="../../data/graphs/"):
         pickle.dump(graph, f)
 
 
-def add_concept_degree(graph: nx.Graph):
+def add_concept_features(graph: nx.Graph, llm_embeddings: bool):
     """
-    Adds node degree as a feature to concepts
+    Adds node degree and llm embeddings to the concepts
     """
-    for node in tqdm(graph.nodes(), desc="Adding node degree to concepts", ncols=100):
+    embeds = None
+    if llm_embeddings:
+        print("Loading LLM concept embeddings")
+        embeds = pd.read_pickle("../../data/text/concepts_embedded.pkl")
+
+    for node in tqdm(graph.nodes(), desc="Adding concept feats", ncols=100):
         if graph.nodes[node]["node_type"] != "concept":
             continue
-        graph.nodes[node]["node_feature"] = torch.tensor(
-            [graph.degree(node)], dtype=torch.float32
-        )
+        degree = graph.degree(node)
+        llm = embeds.loc[node]['label'] if llm_embeddings else None
+        features = torch.tensor([degree], dtype=torch.float32)
+        if llm_embeddings:
+            features = torch.cat((features, torch.tensor(llm, dtype=torch.float32)))
+
+        graph.nodes[node]["node_feature"] = features
 
 
 def prune_disconnected(graph: nx.Graph):
@@ -291,7 +300,7 @@ if __name__ == "__main__":
     if remove_isolates:
         prune_disconnected(graph)
 
-    add_concept_degree(graph)
+    add_concept_features(graph, llm_embeddings)
 
     name = f"{n}"
     name += "_concepts" if concepts else ""
