@@ -205,8 +205,9 @@ class HeteroGNN(torch.nn.Module):
 
         # Initialize graph convolutional layers for each layer and message type
         for i in range(self.num_layers):
+            first_layer = i == 0
             conv = HeteroGNNWrapperConv(
-                    generate_convs(hetero_graph, HeteroGNNConv, self.hidden_size, first_layer=i is 0),
+                    generate_convs(hetero_graph, HeteroGNNConv, self.hidden_size, first_layer),
                     args,
                     self.aggr)
             self.convs.append(conv)
