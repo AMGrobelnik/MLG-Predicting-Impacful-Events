@@ -57,6 +57,7 @@ def filter_json(json_content):
 
             # generate unique ids
             event["info"]["uri"] = generate_id(event["info"]["uri"], "e")
+            event["id"] = event["info"]["uri"]
             event["info"]["eventDate"] = event_date_to_timestamp(event, False)
 
             similar_events = event["similarEvents"]["similarEvents"]
@@ -91,6 +92,7 @@ def filter_json(json_content):
             continue
 
     dataframe = pd.DataFrame(filtered_events)
+    dataframe.set_index("id", inplace=True)
     return dataframe
 
 
@@ -103,7 +105,7 @@ if __name__ == "__main__":
     files = sorted(os.listdir(directory_path))
     files = [filename for filename in files if filename.endswith(".json")]
 
-    files = files[:250]
+    # files = files[:250]
     for filename in tqdm(files, ncols=100, desc="Processing"):
         file_path = os.path.join(directory_path, filename)
 

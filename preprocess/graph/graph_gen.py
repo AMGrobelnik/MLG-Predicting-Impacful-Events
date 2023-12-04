@@ -13,6 +13,7 @@ def get_file_names(count: int, directory="../../data/preprocessed/") -> List[str
     Returns a list of paths to the preprocessed .pkl files
     """
     files = []
+    count = min(count, 2944)  # cap the number of files
     for i in range(1, count + 1):
         file = os.path.join(directory, f"events-{str(i).zfill(5)}.pkl")
         file = os.path.abspath(file)
@@ -103,27 +104,33 @@ def load_llm_embeddings(file: str):
 
 
 def generate_graph(
-    files: List[str],
+    n_files: int,
     include_concepts: bool = True,
     include_similar_events: bool = True,
     include_llm_embeddings: bool = True,
+    no_unknown: bool = True,
 ) -> nx.Graph:
     """
     Generates a graph from a list of files
-    :param files: list of file paths
+    :param n_files: the number of files to include
     :param include_concepts: include the concepts in the graph
     :param include_similar_events: include the similar events and their edges in the graph
     :param include_llm_embeddings: include the LLM embeddings in the graph
-    :return:
+    :param no_unknown: find events without features in other files
+    :return: the generated graph
     """
+    all_files = get_file_names(3000)  # get all files
+    files, other_files = all_files[:n_files], all_files[n_files:]
     G = nx.Graph()
+
+    # Add similar events first to avoid overwriting
+    se_ids = set()
     if include_similar_events:
         for file in tqdm(files, desc="Adding similar events", ncols=100):
             df = pd.read_pickle(file)
-            df_llm = load_llm_embeddings(file)
-            for _, event in df.iterrows():
+            df_llm = load_llm_embeddings(file) if include_llm_embeddings else None
+            for event_id, event in df.iterrows():
                 info, similar_events = event["info"], event["similarEvents"]
-                event_id = info["uri"]
 
                 se_nodes, se_edges = get_similar_events(
                     event_id, similar_events, df_llm
@@ -131,24 +138,58 @@ def generate_graph(
                 G.add_nodes_from(se_nodes)
                 G.add_edges_from(se_edges)
 
-    # Add event data last to avoid overwriting
+                for se in se_nodes:
+                    se_ids.add(se[0])
+
+    # Add event data
     for file in tqdm(files, desc="Adding event data", ncols=100):
         df = pd.read_pickle(file)
-        df_llm = load_llm_embeddings(file)
-        for _, event in df.iterrows():
-            event_id = event["info"]["uri"]
+        df_llm = load_llm_embeddings(file) if include_llm_embeddings else None
+        for event_id, event in df.iterrows():
             G.add_node(event_id, **get_event_attributes(event, False, df_llm))
 
+            # remove id from similar events
+            if event_id in se_ids:
+                se_ids.remove(event_id)
+
+    # Add concepts
     if include_concepts:
         for file in tqdm(files, desc="Adding concepts", ncols=100):
             df = pd.read_pickle(file)
-            for _, event in df.iterrows():
+            for event_id, event in df.iterrows():
                 info = event["info"]
-                event_id = info["uri"]
                 c_nodes, c_edges = get_concepts(event_id, info["concepts"])
                 G.add_nodes_from(c_nodes)
                 G.add_edges_from(c_edges)
 
+    if not no_unknown:
+        return G
+
+    # Add data from other files to similar events
+    for file in tqdm(other_files, desc="Adding data from other files", ncols=100):
+        if len(se_ids) == 0:
+            break
+
+        df = pd.read_pickle(file)
+
+        # Find the ids in the file
+        df_ids = set(df.index)
+        ids = df_ids.intersection(se_ids)
+        if len(ids) == 0:
+            continue
+
+        # remove the ids from the list
+        se_ids = se_ids.difference(ids)
+
+        df_llm = load_llm_embeddings(file) if include_llm_embeddings else None
+        for event_id in ids:
+            event = df.loc[event_id]
+            G.add_node(event_id, **get_event_attributes(event, False, df_llm))
+
+            if include_concepts:
+                c_nodes, c_edges = get_concepts(event_id, event["info"]["concepts"])
+                G.add_nodes_from(c_nodes)
+                G.add_edges_from(c_edges)
     return G
 
 
@@ -166,21 +207,38 @@ def add_concept_features(graph: nx.Graph, llm_embeddings: bool):
     """
     Adds node degree and llm embeddings to the concepts
     """
-    embeds = None
     if llm_embeddings:
         print("Loading LLM concept embeddings")
-        embeds = pd.read_pickle("../../data/text/concepts_embedded.pkl")
+        c_ids = pickle.load(open("../../data/text/concept_embeds/c_ids.pkl", "rb"))
+        # ^ a dict of {file: indices}
 
-    for node in tqdm(graph.nodes(), desc="Adding concept feats", ncols=100):
-        if graph.nodes[node]["node_type"] != "concept":
-            continue
-        degree = graph.degree(node)
-        llm = embeds.loc[node]['label'] if llm_embeddings else None
-        features = torch.tensor([degree], dtype=torch.float32)
-        if llm_embeddings:
-            features = torch.cat((features, torch.tensor(llm, dtype=torch.float32)))
+        # iterate concept nodes in the graph and find the corresponding embedding file
+        file_to_ids = {}
+        concept_ids = set([n for n in graph.nodes() if n.startswith("c")])
+        for file in c_ids.keys():
+            ids = c_ids[file].intersection(concept_ids)
+            concept_ids = concept_ids.difference(ids)
 
-        graph.nodes[node]["node_feature"] = features
+            if len(ids) > 0:
+                file_to_ids[file] = ids
+
+        # add features to the graph, one embedding file at a time
+        for file in tqdm(file_to_ids.keys(), desc="Iterating concept files", ncols=100):
+            embeds = pickle.load(open(f"../../data/text/concept_embeds/{file}", "rb"))
+            for node in tqdm(file_to_ids[file], desc="Adding concept feats", ncols=100):
+                degree = graph.degree(node)
+                llm = torch.tensor(embeds.loc[node]["label"], dtype=torch.float32)
+                features = torch.tensor([degree], dtype=torch.float32)
+                features = torch.cat((features, llm))
+                graph.nodes[node]["node_feature"] = features
+
+    else:
+        for node in tqdm(graph.nodes(), desc="Adding concept feats", ncols=100):
+            if graph.nodes[node]["node_type"] != "concept":
+                continue
+            degree = graph.degree(node)
+            features = torch.tensor([degree], dtype=torch.float32)
+            graph.nodes[node]["node_feature"] = features
 
 
 def prune_disconnected(graph: nx.Graph):
@@ -273,7 +331,28 @@ def print_graph_statistics(graph: nx.Graph):
     )
 
 
-n = 1
+def get_referenced_ids(n_files: int):
+    """
+    Returns a list of all the ids that are referenced in the files
+    """
+    files = get_file_names(n_files)
+
+    e_ids = set()
+    c_ids = set()
+
+    for file in tqdm(files, desc="Getting referenced ids", ncols=100):
+        df = pd.read_pickle(file)
+        for _, event in df.iterrows():
+            e_ids.add(event["info"]["uri"])
+            for c in event["info"]["concepts"]:
+                c_ids.add(c["id"])
+            for se in event["similarEvents"]:
+                e_ids.add(se["uri"])
+
+    return e_ids, c_ids
+
+
+n = 100
 concepts = True
 similar = True
 llm_embeddings = True
@@ -282,15 +361,14 @@ remove_isolates = True
 remove_future = True
 future_threshold = 2
 count_feature = False  # include article counts in the node features
-remove_unknown = False
+no_unknown = True
 
 if __name__ == "__main__":
-    files = get_file_names(n)
+    start_time = pd.Timestamp.now()
+    graph = generate_graph(n, concepts, similar, llm_embeddings, no_unknown)
 
-    graph = generate_graph(files, concepts, similar, llm_embeddings)
-
-    if remove_unknown:
-        remove_unknown_events(graph)  # TODO: Maybe keep the edges
+    # if remove_unknown:
+    #     remove_unknown_events(graph)  # TODO: Maybe keep the edges
 
     tqdm.write("Converting to directed graph")
     graph = nx.DiGraph(graph)
@@ -307,9 +385,12 @@ if __name__ == "__main__":
     name += "_similar" if similar else ""
     name += "_llm" if llm_embeddings else ""
     name += f"_noFutureThr{future_threshold}" if remove_future else ""
-    name += "_noUnknown" if remove_unknown else ""
+    name += "_noUnknown" if no_unknown else ""
     name += "_noIsolates" if remove_isolates else ""
     name += "_withCounts" if count_feature else ""
     save_graph(graph, name)
 
+    end_time = pd.Timestamp.now()
+    print(f"Time taken: {round((end_time - start_time).seconds / 60, 2)} min")
     print_graph_statistics(graph)
+
