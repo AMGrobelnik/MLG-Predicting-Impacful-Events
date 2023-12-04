@@ -384,8 +384,8 @@ if __name__ == "__main__":
     name += "_concepts" if concepts else ""
     name += "_similar" if similar else ""
     name += "_llm" if llm_embeddings else ""
-    name += f"_noFutureThr{future_threshold}" if remove_future else ""
     name += "_noUnknown" if no_unknown else ""
+    name += f"_noFutureThr{future_threshold}" if remove_future else ""
     name += "_noIsolates" if remove_isolates else ""
     name += "_withCounts" if count_feature else ""
     save_graph(graph, name)
