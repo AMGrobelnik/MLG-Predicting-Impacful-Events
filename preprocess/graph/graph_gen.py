@@ -225,7 +225,7 @@ def add_concept_features(graph: nx.Graph, llm_embeddings: bool):
         # add features to the graph, one embedding file at a time
         for file in tqdm(file_to_ids.keys(), desc="Iterating concept files", ncols=100):
             embeds = pickle.load(open(f"../../data/text/concept_embeds/{file}", "rb"))
-            for node in tqdm(file_to_ids[file], desc="Adding concept feats", ncols=100):
+            for node in file_to_ids[file]:
                 degree = graph.degree(node)
                 llm = torch.tensor(embeds.loc[node]["label"], dtype=torch.float32)
                 features = torch.tensor([degree], dtype=torch.float32)
@@ -352,7 +352,7 @@ def get_referenced_ids(n_files: int):
     return e_ids, c_ids
 
 
-n = 100
+n = 1
 concepts = True
 similar = True
 llm_embeddings = True
@@ -360,8 +360,8 @@ llm_embeddings = True
 remove_isolates = True
 remove_future = True
 future_threshold = 2
+no_unknown = False
 count_feature = False  # include article counts in the node features
-no_unknown = True
 
 if __name__ == "__main__":
     start_time = pd.Timestamp.now()
