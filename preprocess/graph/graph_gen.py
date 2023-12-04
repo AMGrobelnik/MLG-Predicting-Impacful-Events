@@ -256,16 +256,19 @@ def remove_future_edges(graph: nx.Graph, threshold: int):
     """
     to_remove = []
     for u, v, data in tqdm(graph.edges(data=True), desc="Removing future", ncols=100):
-        if data["edge_type"] != "similar":
-            continue
-        d1 = graph.nodes[u]["node_feature"][0]
-        d2 = graph.nodes[v]["node_feature"][0]
+        if data["edge_type"] == "related":
+            # remove event -> concept edges
+            if u.startswith('e'):
+                to_remove.append((u, v))
+        else:
+            d1 = graph.nodes[u]["node_feature"][0]
+            d2 = graph.nodes[v]["node_feature"][0]
 
-        # remove the edge if
-        # - it points to the past
-        # - they happen at the same time (i.e. within the threshold)
-        if d1 < d2 or abs(d1 - d2) <= threshold:
-            to_remove.append((u, v))
+            # remove the edge if
+            # - it points to the past
+            # - they happen at the same time (i.e. within the threshold)
+            if d1 < d2 or abs(d1 - d2) <= threshold:
+                to_remove.append((u, v))
 
     graph.remove_edges_from(to_remove)
     tqdm.write(f"Removed {len(to_remove)} future edges")
@@ -360,7 +363,7 @@ llm_embeddings = True
 remove_isolates = True
 remove_future = True
 future_threshold = 2
-no_unknown = False
+no_unknown = True
 count_feature = False  # include article counts in the node features
 
 if __name__ == "__main__":
