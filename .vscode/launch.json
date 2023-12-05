@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "justMyCode": True,
+            "justMyCode": true,
         },
         {
             "name": "graph_gen",
@@ -15,7 +15,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "justMyCode": True,
+            "justMyCode": true,
             "cwd": "C:\\Users\\Adrian\\AI Lab Dropbox\\Adrian Mladenic Grobelnik\\Areas\\Uni\\MLG\\MLG-Predicting-Impacful-Events\\graph_gen"
         },
         {
@@ -24,7 +24,7 @@
             "request": "launch",
             "program": "train_gnn_llm.py",
             "console": "integratedTerminal",
-            "justMyCode": True,
+            "justMyCode": true,
             "cwd": "C:\\Users\\Adrian\\Desktop\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
             "args": [
                 "--mode",
@@ -37,7 +37,7 @@
             "request": "launch",
             "program": "train_gnn_llm.py",
             "console": "integratedTerminal",
-            "justMyCode": True,
+            "justMyCode": true,
             "cwd": "C:\\Users\\Adrian\\Desktop\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
             "args": [
                 "--mode",
@@ -50,7 +50,7 @@
             "request": "launch",
             "program": "train_gnn_llm.py",
             "console": "integratedTerminal",
-            "justMyCode": True,
+            "justMyCode": true,
             "cwd": "C:\\Users\\adria\\Desktop\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
             "args": [
                 "--mode",
@@ -63,7 +63,7 @@
             "request": "launch",
             "program": "train_gnn_llm.py",
             "console": "integratedTerminal",
-            "justMyCode": True,
+            "justMyCode": false,
             "cwd": "C:\\Users\\adria\\Desktop\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
             "args": [
                 "--mode",
