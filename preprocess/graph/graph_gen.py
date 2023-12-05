@@ -76,7 +76,7 @@ def get_concept_attributes(c: dict) -> dict:
 def get_concepts(event_id: str, concepts: dict):
     nodes = [(c["id"], get_concept_attributes(c)) for c in concepts]
     edges = [
-        (event_id, c["id"], {"edge_type": "related", "weight": c["score"]})
+        (event_id, c["id"], {"edge_type": "related"}) # , "weight": c["score"]
         for c in concepts
     ]
 
@@ -90,7 +90,7 @@ def get_similar_events(
         (se["uri"], get_event_attributes(se, True, llm_df)) for se in similar_events
     ]
     edges = [
-        (event_id, se["uri"], {"edge_type": "similar", "weight": se["sim"]})
+        (event_id, se["uri"], {"edge_type": "similar"}) # , "weight": se["sim"]
         for se in similar_events
     ]
 
@@ -119,6 +119,7 @@ def generate_graph(
     :param no_unknown: find events without features in other files
     :return: the generated graph
     """
+    n_files = min(n_files, 2944)  # cap the number of files
     all_files = get_file_names(3000)  # get all files
     files, other_files = all_files[:n_files], all_files[n_files:]
     G = nx.Graph()
@@ -256,16 +257,19 @@ def remove_future_edges(graph: nx.Graph, threshold: int):
     """
     to_remove = []
     for u, v, data in tqdm(graph.edges(data=True), desc="Removing future", ncols=100):
-        if data["edge_type"] != "similar":
-            continue
-        d1 = graph.nodes[u]["node_feature"][0]
-        d2 = graph.nodes[v]["node_feature"][0]
+        if data["edge_type"] == "related":
+            # remove event -> concept edges
+            if u.startswith('e'):
+                to_remove.append((u, v))
+        else:
+            d1 = graph.nodes[u]["node_feature"][0]
+            d2 = graph.nodes[v]["node_feature"][0]
 
-        # remove the edge if
-        # - it points to the past
-        # - they happen at the same time (i.e. within the threshold)
-        if d1 < d2 or abs(d1 - d2) <= threshold:
-            to_remove.append((u, v))
+            # remove the edge if
+            # - it points to the past
+            # - they happen at the same time (i.e. within the threshold)
+            if d1 < d2 or abs(d1 - d2) <= threshold:
+                to_remove.append((u, v))
 
     graph.remove_edges_from(to_remove)
     tqdm.write(f"Removed {len(to_remove)} future edges")
@@ -352,15 +356,15 @@ def get_referenced_ids(n_files: int):
     return e_ids, c_ids
 
 
-n = 1
+n = 3000
 concepts = True
 similar = True
-llm_embeddings = True
+llm_embeddings = False
 
 remove_isolates = True
 remove_future = True
 future_threshold = 2
-no_unknown = False
+no_unknown = True
 count_feature = False  # include article counts in the node features
 
 if __name__ == "__main__":
