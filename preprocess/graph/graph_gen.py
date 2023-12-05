@@ -119,6 +119,7 @@ def generate_graph(
     :param no_unknown: find events without features in other files
     :return: the generated graph
     """
+    n_files = min(n_files, 2944)  # cap the number of files
     all_files = get_file_names(3000)  # get all files
     files, other_files = all_files[:n_files], all_files[n_files:]
     G = nx.Graph()
@@ -355,10 +356,10 @@ def get_referenced_ids(n_files: int):
     return e_ids, c_ids
 
 
-n = 1
+n = 3000
 concepts = True
 similar = True
-llm_embeddings = True
+llm_embeddings = False
 
 remove_isolates = True
 remove_future = True
