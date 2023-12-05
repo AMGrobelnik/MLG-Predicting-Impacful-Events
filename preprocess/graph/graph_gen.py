@@ -76,7 +76,7 @@ def get_concept_attributes(c: dict) -> dict:
 def get_concepts(event_id: str, concepts: dict):
     nodes = [(c["id"], get_concept_attributes(c)) for c in concepts]
     edges = [
-        (event_id, c["id"], {"edge_type": "related", "weight": c["score"]})
+        (event_id, c["id"], {"edge_type": "related"}) # , "weight": c["score"]
         for c in concepts
     ]
 
@@ -90,7 +90,7 @@ def get_similar_events(
         (se["uri"], get_event_attributes(se, True, llm_df)) for se in similar_events
     ]
     edges = [
-        (event_id, se["uri"], {"edge_type": "similar", "weight": se["sim"]})
+        (event_id, se["uri"], {"edge_type": "similar"}) # , "weight": se["sim"]
         for se in similar_events
     ]
 
