@@ -382,7 +382,8 @@ if __name__ == "__main__":
     if remove_isolates:
         prune_disconnected(graph)
 
-    add_concept_features(graph, llm_embeddings)
+    if concepts:
+        add_concept_features(graph, llm_embeddings)
 
     name = f"{n}"
     name += "_concepts" if concepts else ""
