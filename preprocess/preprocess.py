@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from datetime import datetime as dt
 
 import pandas as pd
@@ -19,7 +20,20 @@ def event_date_to_timestamp(event: dict, similar_event: bool):
     event_date = event["eventDate"] if similar_event else event["info"]["eventDate"]
     if event_date == "":
         return 0
-    return round(dt.strptime(event_date, "%Y-%m-%d").timestamp() / 3600 / 24)
+
+    date_obj = dt.strptime(event_date, "%Y-%m-%d")
+    epoch = dt(1970, 1, 1)
+
+    # Check if OS is Windows and date is before 1970
+    if sys.platform == "win32" and date_obj < epoch:
+        # Manually calculate the seconds
+        delta = epoch - date_obj
+        seconds = delta.total_seconds()
+        return round(-seconds / 3600 / 24)
+    else:
+        # Use the standard method for other cases
+        return round(date_obj.timestamp() / 3600 / 24)
+
 
 
 def load_json_file(file_path):
@@ -57,6 +71,7 @@ def filter_json(json_content):
 
             # generate unique ids
             event["info"]["uri"] = generate_id(event["info"]["uri"], "e")
+            event["id"] = event["info"]["uri"]
             event["info"]["eventDate"] = event_date_to_timestamp(event, False)
 
             similar_events = event["similarEvents"]["similarEvents"]
@@ -91,6 +106,7 @@ def filter_json(json_content):
             continue
 
     dataframe = pd.DataFrame(filtered_events)
+    dataframe.set_index("id", inplace=True)
     return dataframe
 
 
@@ -103,7 +119,7 @@ if __name__ == "__main__":
     files = sorted(os.listdir(directory_path))
     files = [filename for filename in files if filename.endswith(".json")]
 
-    files = files[:250]
+    # files = files[:250]
     for filename in tqdm(files, ncols=100, desc="Processing"):
         file_path = os.path.join(directory_path, filename)
 

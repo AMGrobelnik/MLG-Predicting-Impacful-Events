@@ -63,12 +63,21 @@
             "request": "launch",
             "program": "train_gnn_llm.py",
             "console": "integratedTerminal",
-            "justMyCode": false,
+            "justMyCode": true,
             "cwd": "C:\\Users\\adria\\Desktop\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
             "args": [
                 "--mode",
                 "train"
             ]
+        },
+        {
+            "name": "t-SNE Surface",
+            "type": "python",
+            "request": "launch",
+            "program": "t-SNE.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "C:\\Users\\Adrian\\Desktop\\MLG-Predicting-Impacful-Events\\train\\gnn_llm"
         },
     ]
 }

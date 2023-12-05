@@ -103,10 +103,23 @@ def test(model, graph, indices, best_model, best_tvt_scores):
             / non_zero_idx.shape[0]
         )
 
-        tvt_scores.append(L1)
+        meanRelative = (
+            torch.sum(
+                torch.abs(
+                    (
+                        preds["event"][non_zero_idx]
+                        - graph.node_target["event"][non_zero_idx]
+                    )
+                    / graph.node_target["event"][non_zero_idx]
+                )
+            )
+            / non_zero_idx.shape[0]
+        )
+
+        tvt_scores.append((L1, meanRelative))
 
     # Update the best model and validation loss if the current model performs better
-    if tvt_scores[1] < best_tvt_scores[1]:
+    if tvt_scores[1][0] < best_tvt_scores[1][0]:
         best_tvt_scores = tvt_scores
         # torch.to_pickle(model, 'best_model.pkl')
         # model.to_pickle('best_model.pkl')
@@ -193,10 +206,6 @@ def create_split(hetero_graph):
         ),
     }
 
-    print(train_idx["event"].shape)
-    print(test_idx["event"].shape)
-    print(val_idx["event"].shape)
-
     return [train_idx, val_idx, test_idx]
 
 
@@ -206,7 +215,6 @@ def display_results(best_model):
 
 
 def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
-
     aggr_method = trial.suggest_categorical("aggr", ["mean", "attn"])
     attn_size = trial.suggest_int("attn_size", 16, 128) if aggr_method == "attn" else 32
 
@@ -269,7 +277,7 @@ def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
         )
 
         # Update the best validation score
-        if cur_tvt_scores[1] < best_tvt_scores[1]:
+        if cur_tvt_scores[1][0] < best_tvt_scores[1][0]:
             best_tvt_scores = (cur_tvt_scores[0], cur_tvt_scores[1], cur_tvt_scores[2])
 
     # Finish wandb runf
@@ -298,13 +306,18 @@ def hyper_parameter_tuning(hetero_graph):
 
 def train_model(hetero_graph):
     best_model = None
-    best_tvt_scores = (float("inf"), float("inf"), float("inf"))
+    best_tvt_scores = (
+        (float("inf"), float("inf")),
+        (float("inf"), float("inf")),
+        (float("inf"), float("inf")),
+    )
 
     model = HeteroGNN(
         hetero_graph,
         train_args,
         num_layers=train_args["num_layers"],
         aggr=train_args["aggr"],
+        return_embedding=True,
     ).to(train_args["device"])
 
     train_idx, val_idx, test_idx = create_split(hetero_graph)
@@ -325,13 +338,24 @@ def train_model(hetero_graph):
             best_tvt_scores,
         )
         print(
-            f"Epoch {epoch} Loss {loss:.4f} Current Train,Val,Test Scores {[score.item() for score in cur_tvt_scores]}"
+            f"""Epoch: {epoch} Loss: {loss:.4f}
+            Train: Abs={cur_tvt_scores[0][0].item():.4f} Rel={cur_tvt_scores[0][1].item():.4f}
+            Val: Abs={cur_tvt_scores[1][0].item():.4f} Rel={cur_tvt_scores[1][1].item():.4f}
+            Test: Abs={cur_tvt_scores[2][0].item():.4f} Rel={cur_tvt_scores[2][1].item():.4f}"""
         )
 
-    print("Best Train,Val,Test Scores", [score.item() for score in best_tvt_scores])
+    print(
+        f"""Best model
+            Train: Abs={best_tvt_scores[0][0].item():.4f} Rel={best_tvt_scores[0][1].item():.4f}
+            Val: Abs={best_tvt_scores[1][0].item():.4f} Rel={best_tvt_scores[1][1].item():.4f}
+            Test: Abs={best_tvt_scores[2][0].item():.4f} Rel={best_tvt_scores[2][1].item():.4f}"""
+    )
 
     model = HeteroGNN(
-        hetero_graph, train_args, num_layers=train_args["num_layers"], aggr=train_args["aggr"]
+        hetero_graph,
+        train_args,
+        num_layers=train_args["num_layers"],
+        aggr=train_args["aggr"],
     ).to(train_args["device"])
 
     model.load_state_dict(torch.load("./best_model.pkl"))
@@ -346,9 +370,10 @@ def train_model(hetero_graph):
 
 
 def display_predictions(preds, hetero_graph, test_idx):
-    for i in range(1000):
+    for i in range(test_idx["event"].shape[0]):
         if hetero_graph.node_target["event"][test_idx["event"]][i] != -1:
             print(
+                i,
                 preds["event"][test_idx["event"]][i],
                 hetero_graph.node_target["event"][test_idx["event"]][i],
             )
