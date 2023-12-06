@@ -372,7 +372,7 @@ if __name__ == "__main__":
     graph = generate_graph(n, concepts, similar, llm_embeddings, no_unknown)
 
     # if remove_unknown:
-    #     remove_unknown_events(graph)  # TODO: Maybe keep the edges
+    #     remove_unknown_events(graph)
 
     tqdm.write("Converting to directed graph")
     graph = nx.DiGraph(graph)
