@@ -46,10 +46,6 @@ def train(model, optimizer, hetero_graph, train_idx):
     model.train()  # Set the model to training mode
     optimizer.zero_grad()  # Zero out any existing gradients
 
-    # Compute predictions using the model
-    # TODO: Use only train_idx instead of edge_index
-    # TODO: Train only on events not on concepts
-
     preds = model(hetero_graph.node_feature, hetero_graph.edge_index)
 
     # Compute the loss using model's loss function
@@ -116,7 +112,10 @@ def test(model, graph, indices, best_model, best_tvt_scores):
             / non_zero_idx.shape[0]
         )
 
-        tvt_scores.append((L1, meanRelative))
+        mse = torch.mean(torch.square(preds['event'][non_zero_idx] - graph.node_target['event'][non_zero_idx]))
+        mape = torch.mean(torch.abs((preds['event'][non_zero_idx] - graph.node_target['event'][non_zero_idx]) / graph.node_target['event'][non_zero_idx]))
+
+        tvt_scores.append((mse, L1, mape))
 
     # Update the best model and validation loss if the current model performs better
     if tvt_scores[1][0] < best_tvt_scores[1][0]:
@@ -271,8 +270,8 @@ def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
             {
                 "epoch": epoch,
                 "train_loss": train_loss,
-                "val_score": cur_tvt_scores[1],
-                "best_val_score": best_tvt_scores[1],
+                "val_score": cur_tvt_scores[0],
+                "best_val_score": best_tvt_scores[0],
             }
         )
 
@@ -317,7 +316,7 @@ def train_model(hetero_graph):
         train_args,
         num_layers=train_args["num_layers"],
         aggr=train_args["aggr"],
-        return_embedding=True,
+        return_embedding=False,
     ).to(train_args["device"])
 
     train_idx, val_idx, test_idx = create_split(hetero_graph)
@@ -339,16 +338,16 @@ def train_model(hetero_graph):
         )
         print(
             f"""Epoch: {epoch} Loss: {loss:.4f}
-            Train: Abs={cur_tvt_scores[0][0].item():.4f} Rel={cur_tvt_scores[0][1].item():.4f}
-            Val: Abs={cur_tvt_scores[1][0].item():.4f} Rel={cur_tvt_scores[1][1].item():.4f}
-            Test: Abs={cur_tvt_scores[2][0].item():.4f} Rel={cur_tvt_scores[2][1].item():.4f}"""
+            Train: Mse={cur_tvt_scores[0][0].item():.4f} L1={cur_tvt_scores[0][0].item():.4f} Mape={cur_tvt_scores[0][2].item():.4f}
+            Val: Mse={cur_tvt_scores[0][0].item():.4f} L1={cur_tvt_scores[1][1].item():.4f} Mape={cur_tvt_scores[0][2].item():.4f}
+            Test: Mse={cur_tvt_scores[0][0].item():.4f} L1={cur_tvt_scores[2][1].item():.4f} Mape={cur_tvt_scores[0][2].item():.4f}"""
         )
 
     print(
-        f"""Best model
-            Train: Abs={best_tvt_scores[0][0].item():.4f} Rel={best_tvt_scores[0][1].item():.4f}
-            Val: Abs={best_tvt_scores[1][0].item():.4f} Rel={best_tvt_scores[1][1].item():.4f}
-            Test: Abs={best_tvt_scores[2][0].item():.4f} Rel={best_tvt_scores[2][1].item():.4f}"""
+        f"""Best model: {epoch} Loss: {loss:.4f}
+        Train: Mse={best_tvt_scores[0][0].item():.4f} L1={best_tvt_scores[0][0].item():.4f} Mape={best_tvt_scores[0][2].item():.4f}
+        Val: Mse={best_tvt_scores[0][0].item():.4f} L1={best_tvt_scores[1][1].item():.4f} Mape={best_tvt_scores[0][2].item():.4f}
+        Test: Mse={best_tvt_scores[0][0].item():.4f} L1={best_tvt_scores[2][1].item():.4f} Mape={best_tvt_scores[0][2].item():.4f}"""
     )
 
     model = HeteroGNN(
