@@ -76,7 +76,7 @@ def get_concept_attributes(c: dict) -> dict:
 def get_concepts(event_id: str, concepts: dict):
     nodes = [(c["id"], get_concept_attributes(c)) for c in concepts]
     edges = [
-        (event_id, c["id"], {"edge_type": "related"}) # , "weight": c["score"]
+        (event_id, c["id"], {"edge_type": "related"})  # , "weight": c["score"]
         for c in concepts
     ]
 
@@ -90,7 +90,7 @@ def get_similar_events(
         (se["uri"], get_event_attributes(se, True, llm_df)) for se in similar_events
     ]
     edges = [
-        (event_id, se["uri"], {"edge_type": "similar"}) # , "weight": se["sim"]
+        (event_id, se["uri"], {"edge_type": "similar"})  # , "weight": se["sim"]
         for se in similar_events
     ]
 
@@ -241,6 +241,11 @@ def add_concept_features(graph: nx.Graph, llm_embeddings: bool):
             features = torch.tensor([degree], dtype=torch.float32)
             graph.nodes[node]["node_feature"] = features
 
+    # add self loops to concepts
+    for node in tqdm(graph.nodes(), desc="Adding self loops", ncols=100):
+        if graph.nodes[node]["node_type"] == "concept":
+            graph.add_edge(node, node, edge_type="related")
+
 
 def prune_disconnected(graph: nx.Graph):
     """
@@ -259,7 +264,7 @@ def remove_future_edges(graph: nx.Graph, threshold: int):
     for u, v, data in tqdm(graph.edges(data=True), desc="Removing future", ncols=100):
         if data["edge_type"] == "related":
             # remove event -> concept edges
-            if u.startswith('e'):
+            if u.startswith("e"):
                 to_remove.append((u, v))
         else:
             d1 = graph.nodes[u]["node_feature"][0]
@@ -372,7 +377,7 @@ if __name__ == "__main__":
     graph = generate_graph(n, concepts, similar, llm_embeddings, no_unknown)
 
     # if remove_unknown:
-    #     remove_unknown_events(graph)  # TODO: Maybe keep the edges
+    #     remove_unknown_events(graph)
 
     tqdm.write("Converting to directed graph")
     graph = nx.DiGraph(graph)
@@ -398,4 +403,3 @@ if __name__ == "__main__":
     end_time = pd.Timestamp.now()
     print(f"Time taken: {round((end_time - start_time).seconds / 60, 2)} min")
     print_graph_statistics(graph)
-
