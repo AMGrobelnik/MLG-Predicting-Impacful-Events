@@ -406,6 +406,7 @@ def get_batches_from_pickle(folder_path):
             G.nodes[node]['node_label'] = 1
 
         hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
+        graph_tensors_to_device(hetero_graph)
         batches.append(hetero_graph)
 
     return batches
