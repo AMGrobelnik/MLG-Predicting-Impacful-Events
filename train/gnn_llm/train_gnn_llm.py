@@ -117,8 +117,20 @@ def test(model, graph, indices, best_model, best_tvt_scores):
             / non_zero_idx.shape[0]
         )
 
-        mse = torch.mean(torch.square(preds['event'][non_zero_idx] - graph.node_target['event'][non_zero_idx]))
-        mape = torch.mean(torch.abs((preds['event'][non_zero_idx] - graph.node_target['event'][non_zero_idx]) / graph.node_target['event'][non_zero_idx]))
+        mse = torch.mean(
+            torch.square(
+                preds["event"][non_zero_idx] - graph.node_target["event"][non_zero_idx]
+            )
+        )
+        mape = torch.mean(
+            torch.abs(
+                (
+                    preds["event"][non_zero_idx]
+                    - graph.node_target["event"][non_zero_idx]
+                )
+                / graph.node_target["event"][non_zero_idx]
+            )
+        )
 
         tvt_scores.append((mse, L1, mape))
 
@@ -309,9 +321,8 @@ def hyper_parameter_tuning(hetero_graph):
 
 
 def train_model(hetero_graph, batches):
-
     hetero_graph = batches[0]
-    
+
     best_model = None
     best_tvt_scores = (
         (float("inf"), float("inf")),
@@ -327,19 +338,17 @@ def train_model(hetero_graph, batches):
         return_embedding=False,
     ).to(train_args["device"])
 
-
     optimizer = torch.optim.Adam(
         model.parameters(), lr=train_args["lr"], weight_decay=train_args["weight_decay"]
     )
 
     for epoch in range(train_args["epochs"]):
         for batch in batches:
-            
             model.hetero_graph = batch
 
             train_idx, val_idx, test_idx = create_split(batch)
             # Train
-            #loss = train(model, optimizer, hetero_graph, train_idx)
+            # loss = train(model, optimizer, hetero_graph, train_idx)
             loss = train(model, optimizer, batch, train_idx)
             # Test for the accuracy of the model
             cur_tvt_scores, best_tvt_scores, best_model = test(
@@ -370,15 +379,15 @@ def train_model(hetero_graph, batches):
         aggr=train_args["aggr"],
     ).to(train_args["device"])
 
-    model.load_state_dict(torch.load("./best_model.pkl"))
+    # model.load_state_dict(torch.load("./best_model.pkl"))
 
-    preds = model(hetero_graph.node_feature, hetero_graph.edge_index)
+    # preds = model(hetero_graph.node_feature, hetero_graph.edge_index)
 
-    cur_tvt_scores, best_tvt_scores, best_model = test(
-        model, hetero_graph, [train_idx, val_idx, test_idx], best_model, best_tvt_scores
-    )
+    # cur_tvt_scores, best_tvt_scores, best_model = test(
+    #     model, hetero_graph, [train_idx, val_idx, test_idx], best_model, best_tvt_scores
+    # )
 
-    display_predictions(preds, hetero_graph, test_idx)
+    # # display_predictions(preds, hetero_graph, test_idx)
 
 
 def display_predictions(preds, hetero_graph, test_idx):
@@ -390,8 +399,8 @@ def display_predictions(preds, hetero_graph, test_idx):
                 hetero_graph.node_target["event"][test_idx["event"]][i],
             )
 
-def get_batches_from_pickle(folder_path):
 
+def get_batches_from_pickle(folder_path):
     pickle_files = os.listdir(folder_path)
 
     batches = []
@@ -399,17 +408,15 @@ def get_batches_from_pickle(folder_path):
     for file_name in pickle_files:
         file_path = os.path.join(folder_path, file_name)
         print(file_path)
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             G = pickle.load(f)
-
-        for node in G.nodes():
-            G.nodes[node]['node_label'] = 1
 
         hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
         graph_tensors_to_device(hetero_graph)
         batches.append(hetero_graph)
 
     return batches
+
 
 def get_hetero_graph_dataset(folder_path):
     pickle_files = os.listdir(folder_path)
@@ -419,18 +426,19 @@ def get_hetero_graph_dataset(folder_path):
     for file_name in pickle_files:
         file_path = os.path.join(folder_path, file_name)
         print(file_path)
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             G = pickle.load(f)
 
         for node in G.nodes():
-            G.nodes[node]['node_label'] = 1
+            G.nodes[node]["node_label"] = 1
 
         hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
         subgraphs.append(hetero_graph)
 
-    dataset = GraphDataset(subgraphs, task='node')
+    dataset = GraphDataset(subgraphs, task="node")
 
     return dataset
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -444,12 +452,12 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    batches = get_batches_from_pickle('../../data/graphs/neighborhood_sampling')
-    
+    batches = get_batches_from_pickle("../../data/graphs/neighborhood_sampling")
+
     # Load the heterogeneous graph data
 
     # with open("./1_concepts_similar_llm.pkl", "rb") as f:
-        # G = pickle.load(f)
+    # G = pickle.load(f)
 
     # Create a HeteroGraph object from the networkx graph
 
