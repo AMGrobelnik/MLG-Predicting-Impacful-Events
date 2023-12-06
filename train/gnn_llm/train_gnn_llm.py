@@ -310,11 +310,8 @@ def hyper_parameter_tuning(hetero_graph):
 
 def train_model(hetero_graph, batches):
 
-    train, val, test = dataset.split(transductive=True, split_ratio=[0.8,0.1,0.1])
-    train_loader = DataLoader(train, batch_size=1, shuffle=True, collate_fn=Batch.collate())
-    val_loader = DataLoader(val, batch_size=1, shuffle=True, collate_fn=Batch.collate())
-    test_loader = DataLoader(test, batch_size=1, shuffle=True, collate_fn=Batch.collate())
-
+    hetero_graph = batches[0]
+    
     best_model = None
     best_tvt_scores = (
         (float("inf"), float("inf")),
@@ -323,7 +320,7 @@ def train_model(hetero_graph, batches):
     )
 
     model = HeteroGNN(
-        hetero_graph,
+        batches[0],
         train_args,
         num_layers=train_args["num_layers"],
         aggr=train_args["aggr"],
@@ -335,12 +332,9 @@ def train_model(hetero_graph, batches):
         model.parameters(), lr=train_args["lr"], weight_decay=train_args["weight_decay"]
     )
 
-    for epoch in range(train_args['epochs']):
-        for train_batch, val_batch, test_batch in zip(train_loader, val_loader, test_loader):
-            loss = train(model, optimizer, train_batch)
-
     for epoch in range(train_args["epochs"]):
         for batch in batches:
+            
             model.hetero_graph = batch
 
             train_idx, val_idx, test_idx = create_split(batch)
@@ -449,24 +443,21 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    dataset = get_hetero_graph_dataset('./subgraphs')
-    train, val, test = dataset.split(transductive=True, split_ratio=[0.8,0.1,0.1])
-
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=Batch.collate())
-
+    batches = get_batches_from_pickle('../../data/graphs/neighborhood_sampling')
+    
     # Load the heterogeneous graph data
 
-    with open("./1_concepts_similar_llm.pkl", "rb") as f:
-        G = pickle.load(f)
+    # with open("./1_concepts_similar_llm.pkl", "rb") as f:
+        # G = pickle.load(f)
 
     # Create a HeteroGraph object from the networkx graph
 
-    hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
-
+    # hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
+    hetero_graph = None
     # Send all the necessary tensors to the same device
-    graph_tensors_to_device(hetero_graph)
+    # graph_tensors_to_device(hetero_graph)
 
     if args.mode == "tune":
         hyper_parameter_tuning(hetero_graph)
     if args.mode == "train":
-        train_model(hetero_graph, dataloader)
+        train_model(hetero_graph, batches)
