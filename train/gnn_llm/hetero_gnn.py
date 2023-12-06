@@ -190,15 +190,23 @@ def generate_convs(hetero_graph, conv, hidden_size, first_layer=False):
 
 
 class HeteroGNN(torch.nn.Module):
-    def __init__(
-        self, hetero_graph, args, num_layers, aggr="mean", return_embedding=False
-    ):
+    def __init__(self, hetero_graph, args, num_layers, aggr="mean", return_embedding=False, mask_unknown=True):
+        """
+        Initializes the HeteroGNN instance.
+        :param hetero_graph: The heterogeneous graph for which convolutions are to be created.
+        :param args: Arguments dictionary containing hyperparameters like hidden_size and attn_size.
+        :param num_layers: Number of graph convolutional layers.
+        :param aggr: Aggregation method 'mean' or 'attn', defaults to 'mean'.
+        :param return_embedding: Boolean indicating if the model should return embeddings or predictions.
+        :param mask_unknown: Boolean indicating if the model should mask unknown nodes (with target -1) when calculating loss.
+        """
         super(HeteroGNN, self).__init__()
 
         self.aggr = aggr
         self.hidden_size = args["hidden_size"]
         self.num_layers = num_layers
         self.return_embedding = return_embedding
+        self.mask_unknown = mask_unknown
 
         # Use a single ModuleDict for batch normalization and ReLU layers
         self.bns = nn.ModuleDict()
@@ -208,13 +216,11 @@ class HeteroGNN(torch.nn.Module):
 
         # Initialize graph convolutional layers for each layer and message type
         for i in range(self.num_layers):
+            first_layer = i == 0
             conv = HeteroGNNWrapperConv(
-                generate_convs(
-                    hetero_graph, HeteroGNNConv, self.hidden_size, first_layer=i is 0
-                ),
-                args,
-                self.aggr,
-            )
+                    generate_convs(hetero_graph, HeteroGNNConv, self.hidden_size, first_layer),
+                    args,
+                    self.aggr)
             self.convs.append(conv)
 
         # Initialize batch normalization and ReLU layers for each layer and node type
@@ -279,9 +285,14 @@ class HeteroGNN(torch.nn.Module):
         # loss_func = mape
         # MAPE PRODUCES BETTER EVAL RESULTS BUT WORSE PREDICTIONS
 
-        mask = y["event"][indices["event"], 0] != -1
-        non_zero_idx = torch.masked_select(indices["event"], mask)
+        if self.mask_unknown:
+            mask = y["event"][indices["event"], 0] != -1
+            non_zero_idx = torch.masked_select(indices["event"], mask)
 
-        loss += loss_func(preds["event"][non_zero_idx], y["event"][non_zero_idx])
+            loss += loss_func(preds["event"][non_zero_idx], y["event"][non_zero_idx])
+        else:
+            # TODO: check if this is correct
+            idx = indices["event"]
+            loss += loss_func(preds["event"][idx], y["event"][idx])
 
         return loss

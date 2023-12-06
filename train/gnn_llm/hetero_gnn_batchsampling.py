@@ -411,7 +411,7 @@ class HeteroGNN(torch.nn.Module):
                 sampled_event_node = src_indices[sampled_event_node_idx].item()
 
                 # Get the k-hop neighborhood of the sampled node
-                k_hop_neighbors = self.get_k_hop_neighbors(src_indices, dst_indices, sampled_event_node, self.num_layers)
+                k_hop_neighbors = self.get_k_hop_neighbors(src_indices, dst_indices, sampled_event_node, sampled_event_node_idx, self.num_layers)
 
                 # Get the node features for the sampled node and its k-hop neighborhood
                 node_feature_mini['event'] = self.hetero_graph.node_feature['event'][list(k_hop_neighbors)]
@@ -449,7 +449,7 @@ class HeteroGNN(torch.nn.Module):
         :return: The output embeddings for each node type after passing through the model.
         """
         
-        node_feature_mini, edge_index_mini = self.gen_minibatch(10)
+        # node_feature_mini, edge_index_mini = self.gen_minibatch(10)
         
         x = node_feature
 
