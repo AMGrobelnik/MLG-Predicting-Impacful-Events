@@ -293,6 +293,6 @@ class HeteroGNN(torch.nn.Module):
         else:
             # TODO: check if this is correct
             idx = indices["event"]
-            loss += loss_func(preds["event"][idx], y["event"][idx])
+            loss += loss_func(preds["event"][id , y["event"][idx]])
 
         return loss
