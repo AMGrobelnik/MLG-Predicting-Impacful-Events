@@ -292,7 +292,6 @@ def train_model(hetero_graph, train_batches, val_batches, test_batches):
         return_embedding=False,
     ).to(train_args["device"])
 
-
     optimizer = torch.optim.Adam(
         model.parameters(), lr=train_args["lr"], weight_decay=train_args["weight_decay"]
     )
@@ -385,8 +384,8 @@ def display_predictions(preds, hetero_graph, test_idx):
                 hetero_graph.node_target["event"][test_idx["event"]][i],
             )
 
-def get_batches_from_pickle(folder_path):
 
+def get_batches_from_pickle(folder_path):
     pickle_files = os.listdir(folder_path)
 
     batches = []
@@ -394,16 +393,15 @@ def get_batches_from_pickle(folder_path):
     for file_name in pickle_files:
         file_path = os.path.join(folder_path, file_name)
         print(file_path)
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             G = pickle.load(f)
 
-        for node in G.nodes():
-            G.nodes[node]['node_label'] = 1
-
         hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
+        graph_tensors_to_device(hetero_graph)
         batches.append(hetero_graph)
 
     return batches
+
 
 def get_hetero_graph_dataset(folder_path):
     pickle_files = os.listdir(folder_path)
@@ -413,18 +411,19 @@ def get_hetero_graph_dataset(folder_path):
     for file_name in pickle_files:
         file_path = os.path.join(folder_path, file_name)
         print(file_path)
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             G = pickle.load(f)
 
         for node in G.nodes():
-            G.nodes[node]['node_label'] = 1
+            G.nodes[node]["node_label"] = 1
 
         hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
         subgraphs.append(hetero_graph)
 
-    dataset = GraphDataset(subgraphs, task='node')
+    dataset = GraphDataset(subgraphs, task="node")
 
     return dataset
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -447,7 +446,7 @@ if __name__ == "__main__":
     # Load the heterogeneous graph data
 
     # with open("./1_concepts_similar_llm.pkl", "rb") as f:
-        # G = pickle.load(f)
+    # G = pickle.load(f)
 
     # Create a HeteroGraph object from the networkx graph
 
