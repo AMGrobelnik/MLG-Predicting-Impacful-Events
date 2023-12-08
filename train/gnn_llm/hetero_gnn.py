@@ -224,6 +224,7 @@ class HeteroGNN(torch.nn.Module):
 
         # Initialize batch normalization and ReLU layers for each layer and node type
         all_node_types = hetero_graph.node_types
+        print(all_node_types)
         for i in range(self.num_layers):
             for node_type in all_node_types:
                 key_bn = f"bn_{i}_{node_type}"
@@ -265,7 +266,7 @@ class HeteroGNN(torch.nn.Module):
 
         return x
 
-    def loss(self, preds, y, indices):
+    def loss(self, preds, y):
         """
         Computes the loss for the model.
 
@@ -281,17 +282,17 @@ class HeteroGNN(torch.nn.Module):
         loss = 0
         loss_func = torch.nn.MSELoss()
 
-        # loss_func = mape
-        # MAPE PRODUCES BETTER EVAL RESULTS BUT WORSE PREDICTIONS
+        loss += loss_func(preds["event_target"], y["event_target"])
 
-        if self.mask_unknown:
-            mask = y["event"][indices["event"], 0] != -1
-            non_zero_idx = torch.masked_select(indices["event"], mask)
-
-            loss += loss_func(preds["event"][non_zero_idx], y["event"][non_zero_idx])
-        else:
-            # TODO: check if this is correct
-            idx = indices["event"]
-            loss += loss_func(preds["event"][id , y["event"][idx]])
-
+        #
+        # if self.mask_unknown:
+        #     mask = y["event"][indices["event"], 0] != -1
+        #     non_zero_idx = torch.masked_select(indices["event"], mask)
+        #
+        #     loss += loss_func(preds["event"][non_zero_idx], y["event"][non_zero_idx])
+        # else:
+        #     # TODO: check if this is correct
+        #     idx = indices["event"]
+        #     loss += loss_func(preds["event"][id , y["event"][idx]])
+        #
         return loss
