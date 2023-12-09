@@ -3,6 +3,7 @@ preprocessed/*
 graphs/*
 text/*
 postprocess/*
+batch/*
 
 # Don't ignore .gitkeep files
 !.gitkeep

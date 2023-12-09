@@ -1,11 +1,6 @@
 import copy
-import os
 import torch
 import deepsnap
-import deepsnap.batch
-from deepsnap.dataset import GraphDataset
-from deepsnap.batch import Batch
-from torch.utils.data import DataLoader
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
@@ -27,7 +22,7 @@ from hetero_gnn import HeteroGNN
 train_args = {
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     "hidden_size": 81,
-    "epochs": 10,
+    "epochs": 233,
     "weight_decay": 0.00002203762357664057,
     "lr": 0.003873757421883433,
     "attn_size": 32,
@@ -94,36 +89,14 @@ def test(model, graph, indices, best_model, best_tvt_scores):
         mask = graph.node_target["event"][idx, 0] != -1
         non_zero_idx = torch.masked_select(idx, mask)
 
-        L1 = (
-            torch.sum(
-                torch.abs(
-                    preds["event"][non_zero_idx]
-                    - graph.node_target["event"][non_zero_idx]
-                )
-            )
-            / non_zero_idx.shape[0]
-        )
-
-        meanRelative = (
-            torch.sum(
-                torch.abs(
-                    (
-                        preds["event"][non_zero_idx]
-                        - graph.node_target["event"][non_zero_idx]
-                    )
-                    / graph.node_target["event"][non_zero_idx]
-                )
-            )
-            / non_zero_idx.shape[0]
-        )
-
+        L1 = torch.mean(torch.abs(preds["event"][non_zero_idx]- graph.node_target["event"][non_zero_idx]))
         mse = torch.mean(torch.square(preds['event'][non_zero_idx] - graph.node_target['event'][non_zero_idx]))
         mape = torch.mean(torch.abs((preds['event'][non_zero_idx] - graph.node_target['event'][non_zero_idx]) / graph.node_target['event'][non_zero_idx]))
 
         tvt_scores.append((mse, L1, mape))
 
     # Update the best model and validation loss if the current model performs better
-    if tvt_scores[1][0] < best_tvt_scores[1][0]:
+    if tvt_scores[1][1] < best_tvt_scores[1][1]:
         best_tvt_scores = tvt_scores
         # torch.to_pickle(model, 'best_model.pkl')
         # model.to_pickle('best_model.pkl')
@@ -308,10 +281,7 @@ def hyper_parameter_tuning(hetero_graph):
         print(f"    {key}: {value}")
 
 
-def train_model(hetero_graph, batches):
-
-    hetero_graph = batches[0]
-    
+def train_model(hetero_graph):
     best_model = None
     best_tvt_scores = (
         (float("inf"), float("inf")),
@@ -320,47 +290,43 @@ def train_model(hetero_graph, batches):
     )
 
     model = HeteroGNN(
-        batches[0],
+        hetero_graph,
         train_args,
         num_layers=train_args["num_layers"],
         aggr=train_args["aggr"],
         return_embedding=False,
+        mask_unknown=True
     ).to(train_args["device"])
 
+    train_idx, val_idx, test_idx = create_split(hetero_graph)
 
     optimizer = torch.optim.Adam(
         model.parameters(), lr=train_args["lr"], weight_decay=train_args["weight_decay"]
     )
 
     for epoch in range(train_args["epochs"]):
-        for batch in batches:
-            
-            model.hetero_graph = batch
-
-            train_idx, val_idx, test_idx = create_split(batch)
-            # Train
-            #loss = train(model, optimizer, hetero_graph, train_idx)
-            loss = train(model, optimizer, batch, train_idx)
-            # Test for the accuracy of the model
-            cur_tvt_scores, best_tvt_scores, best_model = test(
-                model,
-                batch,
-                [train_idx, val_idx, test_idx],
-                best_model,
-                best_tvt_scores,
-            )
-            print(
-                f"""Epoch: {epoch} Loss: {loss:.4f}
-                Train: Mse={cur_tvt_scores[0][0].item():.4f} L1={cur_tvt_scores[0][0].item():.4f} Mape={cur_tvt_scores[0][2].item():.4f}
-                Val: Mse={cur_tvt_scores[0][0].item():.4f} L1={cur_tvt_scores[1][1].item():.4f} Mape={cur_tvt_scores[0][2].item():.4f}
-                Test: Mse={cur_tvt_scores[0][0].item():.4f} L1={cur_tvt_scores[2][1].item():.4f} Mape={cur_tvt_scores[0][2].item():.4f}"""
-            )
+        # Train
+        loss = train(model, optimizer, hetero_graph, train_idx)
+        # Test for the accuracy of the model
+        cur_tvt_scores, best_tvt_scores, best_model = test(
+            model,
+            hetero_graph,
+            [train_idx, val_idx, test_idx],
+            best_model,
+            best_tvt_scores,
+        )
+        print(
+            f"""Epoch: {epoch} Loss: {loss:.4f}
+            Train: Mse={cur_tvt_scores[0][0].item():.4f} L1={cur_tvt_scores[0][1].item():.4f} Mape={cur_tvt_scores[0][2].item():.4f}
+            Val: Mse={cur_tvt_scores[1][0].item():.4f} L1={cur_tvt_scores[1][1].item():.4f} Mape={cur_tvt_scores[1][2].item():.4f}
+            Test: Mse={cur_tvt_scores[2][0].item():.4f} L1={cur_tvt_scores[2][1].item():.4f} Mape={cur_tvt_scores[2][2].item():.4f}"""
+        )
 
     print(
         f"""Best model: {epoch} Loss: {loss:.4f}
-        Train: Mse={best_tvt_scores[0][0].item():.4f} L1={best_tvt_scores[0][0].item():.4f} Mape={best_tvt_scores[0][2].item():.4f}
-        Val: Mse={best_tvt_scores[0][0].item():.4f} L1={best_tvt_scores[1][1].item():.4f} Mape={best_tvt_scores[0][2].item():.4f}
-        Test: Mse={best_tvt_scores[0][0].item():.4f} L1={best_tvt_scores[2][1].item():.4f} Mape={best_tvt_scores[0][2].item():.4f}"""
+        Train: Mse={cur_tvt_scores[0][0].item():.4f} L1={cur_tvt_scores[0][1].item():.4f} Mape={cur_tvt_scores[0][2].item():.4f}
+        Val: Mse={cur_tvt_scores[1][0].item():.4f} L1={cur_tvt_scores[1][1].item():.4f} Mape={cur_tvt_scores[1][2].item():.4f}
+        Test: Mse={cur_tvt_scores[2][0].item():.4f} L1={cur_tvt_scores[2][1].item():.4f} Mape={cur_tvt_scores[2][2].item():.4f}"""
     )
 
     model = HeteroGNN(
@@ -390,47 +356,6 @@ def display_predictions(preds, hetero_graph, test_idx):
                 hetero_graph.node_target["event"][test_idx["event"]][i],
             )
 
-def get_batches_from_pickle(folder_path):
-
-    pickle_files = os.listdir(folder_path)
-
-    batches = []
-
-    for file_name in pickle_files:
-        file_path = os.path.join(folder_path, file_name)
-        print(file_path)
-        with open(file_path, 'rb') as f:
-            G = pickle.load(f)
-
-        for node in G.nodes():
-            G.nodes[node]['node_label'] = 1
-
-        hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
-        graph_tensors_to_device(hetero_graph)
-        batches.append(hetero_graph)
-
-    return batches
-
-def get_hetero_graph_dataset(folder_path):
-    pickle_files = os.listdir(folder_path)
-
-    subgraphs = []
-
-    for file_name in pickle_files:
-        file_path = os.path.join(folder_path, file_name)
-        print(file_path)
-        with open(file_path, 'rb') as f:
-            G = pickle.load(f)
-
-        for node in G.nodes():
-            G.nodes[node]['node_label'] = 1
-
-        hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
-        subgraphs.append(hetero_graph)
-
-    dataset = GraphDataset(subgraphs, task='node')
-
-    return dataset
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -444,20 +369,23 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    batches = get_batches_from_pickle('../../data/graphs/neighborhood_sampling')
-    
     # Load the heterogeneous graph data
-    with open("./1_concepts_similar_llm.pkl", "rb") as f:
+    with open("./1_concepts_similar_llm_noFutureThr2_noIsolates.pkl", "rb") as f:
         G = pickle.load(f)
+        
+    # for n in G.nodes(data=True):
+    #     if n[1]['node_feature'].shape[0] != 101:
+    #         print("DIMA", n[0], n[1]['node_feature'].shape)
 
     # Create a HeteroGraph object from the networkx graph
+    hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
 
-    # hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
-    hetero_graph = None
+    print("DIM: ", hetero_graph.node_feature['event'][0].shape)
+
     # Send all the necessary tensors to the same device
-    # graph_tensors_to_device(hetero_graph)
-
+    graph_tensors_to_device(hetero_graph)
+    args.mode = 'train'
     if args.mode == "tune":
         hyper_parameter_tuning(hetero_graph)
     if args.mode == "train":
-        train_model(hetero_graph, batches)
+        train_model(hetero_graph)

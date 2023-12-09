@@ -46,7 +46,7 @@ def get_event_attributes(
         else:
             if not is_similar:
                 tqdm.write(f"WARNING: LLM not found for {uri}")
-            feature_tensor = torch.cat((feature_tensor, torch.zeros(768 * 1)))
+            feature_tensor = torch.cat((feature_tensor, torch.zeros(embedding_dim * 1)))
 
     if count_feature:
         feature_tensor = torch.cat(
@@ -99,7 +99,7 @@ def get_similar_events(
 
 def load_llm_embeddings(file: str):
     file_name = file.split("/")[-1]
-    df = pd.read_pickle(f"../../data/text/embedded/{file_name}")
+    df = pd.read_pickle(f"../../data/text/{embedded_directory}/{file_name}")
     return df
 
 
@@ -225,7 +225,9 @@ def add_concept_features(graph: nx.Graph, llm_embeddings: bool):
 
         # add features to the graph, one embedding file at a time
         for file in tqdm(file_to_ids.keys(), desc="Iterating concept files", ncols=100):
-            embeds = pickle.load(open(f"../../data/text/concept_embeds/{file}", "rb"))
+            embeds = pickle.load(
+                open(f"../../data/text/{concept_embeds_filename}/{file}", "rb")
+            )
             for node in file_to_ids[file]:
                 degree = graph.degree(node)
                 llm = torch.tensor(embeds.loc[node]["label"], dtype=torch.float32)
@@ -369,8 +371,13 @@ llm_embeddings = True
 remove_isolates = True
 remove_future = True
 future_threshold = 2
-no_unknown = True
+no_unknown = False
 count_feature = False  # include article counts in the node features
+
+embedded_directory = "embedded_umap"
+concept_embeds_filename = "concept_embeds_umap"
+embedding_dim = 50
+
 
 def main():
     start_time = pd.Timestamp.now()
