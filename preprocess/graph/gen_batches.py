@@ -116,8 +116,9 @@ def load_files(files_to_idx):
     """
     if src_files is not None:
         return src_files
+    else:
+        src_files = {}
 
-    src_files = {}
     for file_name in files_to_idx.keys():
         if file_name in src_files:
             continue
