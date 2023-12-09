@@ -324,9 +324,7 @@ def objective(
         )
 
     print(f"Best model: Epoch {best_epoch}, Best Metric Val Loss: {best_loss:.1f}")
-    wandb.log({
-    "best_metric_val_loss": best_loss
-    })
+    wandb.log({"best_metric_val_loss": best_loss})
     ## TEST
 
     model = HeteroGNN(
@@ -339,7 +337,7 @@ def objective(
     model.load_state_dict(torch.load("./best_model.pkl"))
 
     test_losses = np.zeros(3)
-    
+
     for test_batch, test_batch_cpu in zip(test_batches, test_batches_cpu):
         # if epoch == 0 or True:
         test_batch_gpu = graph_tensors_to_device(test_batch, test_batch_cpu)
@@ -351,7 +349,7 @@ def objective(
         test_losses += np.array([L1_test.item(), mse_test.item(), mape_test.item()])
 
         preds = model(hetero_graph.node_feature, hetero_graph.edge_index)
-        
+
         display_predictions(preds, hetero_graph)
 
     # cur_tvt_scores, best_tvt_scores, best_model = test(
@@ -365,13 +363,15 @@ def objective(
         Mse={test_losses[1]:.1f} L1={test_losses[0]:.1f} Mape={test_losses[2]:.1f}
         """
     )
-    
-    wandb.log({
-    "test_l1_loss": test_losses[0],
-    "test_mse_loss": test_losses[1],
-    "test_mape_loss": test_losses[2]
-    })
-    
+
+    wandb.log(
+        {
+            "test_l1_loss": test_losses[0],
+            "test_mse_loss": test_losses[1],
+            "test_mape_loss": test_losses[2],
+        }
+    )
+
     # Finish wandb run
     wandb.finish()
 
@@ -452,7 +452,7 @@ def hyper_parameter_tuning(
             val_batches_cpu,
             test_batches_cpu,
         ),
-        n_trials=5,
+        n_trials=100,
     )
 
     print("Best trial:")
@@ -488,7 +488,7 @@ def train_model(
     )
 
     best_loss = float("inf")
-    best_epoch =0
+    best_epoch = 0
     for epoch in range(train_args["epochs"]):
         train_losses = np.zeros(4)
 
@@ -552,8 +552,7 @@ def train_model(
     model.load_state_dict(torch.load("./best_model.pkl"))
 
     test_losses = np.zeros(3)
-    
-    
+
     for test_batch, test_batch_cpu in zip(test_batches, test_batches_cpu):
         # if epoch == 0 or True:
         test_batch_gpu = graph_tensors_to_device(test_batch, test_batch_cpu)
@@ -565,7 +564,7 @@ def train_model(
         test_losses += np.array([L1_test.item(), mse_test.item(), mape_test.item()])
 
         preds = model(hetero_graph.node_feature, hetero_graph.edge_index)
-        
+
         display_predictions(preds, hetero_graph)
 
     # cur_tvt_scores, best_tvt_scores, best_model = test(
@@ -580,7 +579,9 @@ def train_model(
         """
     )
 
+
 # dsff
+
 
 def display_predictions(preds, hetero_graph):
     print("Index | Predicted Value | Actual Value | Difference")
@@ -589,10 +590,11 @@ def display_predictions(preds, hetero_graph):
     for i in range(hetero_graph.node_target["event_target"].shape[0]):
         predicted_value = round(preds["event_target"][i].item(), 2)
         actual_value = round(hetero_graph.node_target["event_target"][i].item(), 2)
-        difference = round(abs(predicted_value - actual_value), 2)  # Calculate and round the absolute difference
+        difference = round(
+            abs(predicted_value - actual_value), 2
+        )  # Calculate and round the absolute difference
 
         print(f"{i:<6} | {predicted_value:<16} | {actual_value:<13} | {difference:<10}")
-
 
 
 def get_batches_from_pickle(folder_path):
