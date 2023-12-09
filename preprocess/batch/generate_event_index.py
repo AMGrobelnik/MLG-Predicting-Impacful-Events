@@ -14,7 +14,7 @@ if __name__ == "__main__":
     index = {}
     for filename in tqdm(files, ncols=100, desc="Processing"):
         file_path = os.path.join(directory_path, filename)
-        file_name = os.path.splitext(filename)[0]
+        file_name = os.path.splitext(os.path.basename(filename))[0]
 
         df = pd.read_pickle(file_path)
         index[file_name] = set(df.index)
