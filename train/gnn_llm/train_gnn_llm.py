@@ -25,7 +25,8 @@ import argparse
 from hetero_gnn import HeteroGNN
 
 train_args = {
-    "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    # "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    "device": "cpu",
     "hidden_size": 81,
     "epochs": 100,
     "weight_decay": 0.00002203762357664057,
@@ -307,6 +308,7 @@ def train_model(hetero_graph, train_batches, val_batches, test_batches):
 
             model.hetero_graph = train_batch
 
+
             loss_train = train(model, optimizer, train_batch)
             (L1_train, mse_train, mape_train) = test(model, model.hetero_graph)
 
@@ -397,7 +399,7 @@ def get_batches_from_pickle(folder_path):
             G = pickle.load(f)
 
         hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
-        graph_tensors_to_device(hetero_graph)
+        # graph_tensors_to_device(hetero_graph)
         batches.append(hetero_graph)
 
     return batches

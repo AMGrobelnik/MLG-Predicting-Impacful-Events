@@ -9,8 +9,13 @@ batch_size = 1
 input_directory = "../../data/graphs/neighborhood_sampling/"
 output_directory = "../../data/graphs/batches/"
 
+
 def get_nodes_by_type(graph, node_type):
-    return [node for node, data in graph.nodes(data=True) if data.get('node_type') == node_type]
+    return [
+        node
+        for node, data in graph.nodes(data=True)
+        if data.get("node_type") == node_type
+    ]
 
 
 pickle_files = os.listdir(input_directory)
@@ -36,10 +41,12 @@ for i in tqdm(range(0, len(pickle_files), batch_size), desc="Processing Batches"
             current_graph = pickle.load(f)
             combined_graph = nx.compose(combined_graph, current_graph)
             # Choose 10 random nodes of type 'event'
-            event_nodes = get_nodes_by_type(combined_graph, 'event')
-            selected_nodes = random.sample(event_nodes, min(10, len(event_nodes)))
+            event_nodes = get_nodes_by_type(combined_graph, "event")
+            selected_nodes = random.sample(event_nodes, min(100, len(event_nodes)))
             for node in selected_nodes:
-                combined_graph.nodes[node]['node_type'] = 'event_target'
+                if combined_graph.in_degree(node) > 1:
+                    print("INDEGREE IS VALID")
+                    combined_graph.nodes[node]["node_type"] = "event_target"
             print(combined_graph.number_of_nodes())
 
     # if os.path.exists(os.path.join(output_directory, "/train")) == False:
@@ -51,19 +58,16 @@ for i in tqdm(range(0, len(pickle_files), batch_size), desc="Processing Batches"
 
     if batch_num < split_ratio[0] * num_batches:
         with open(
-            os.path.join(output_directory, f"train/{batch_num}_train.pkl"), "wb"
-            os.path.join(output_directory, f"train/{batch_num}_train.pkl"), "wb"
+            os.path.join(output_directory, f"train\\{batch_num}_train.pkl"), "wb"
         ) as f:
             pickle.dump(combined_graph, f)
     elif batch_num < (split_ratio[0] + split_ratio[1]) * num_batches:
         with open(
-            os.path.join(output_directory, f"val/{batch_num}_val.pkl"), "wb"
-            os.path.join(output_directory, f"val/{batch_num}_val.pkl"), "wb"
+            os.path.join(output_directory, f"val\\{batch_num}_val.pkl"), "wb"
         ) as f:
             pickle.dump(combined_graph, f)
     else:
         with open(
-            os.path.join(output_directory, f"test/{batch_num}_test.pkl"), "wb"
-            os.path.join(output_directory, f"test/{batch_num}_test.pkl"), "wb"
+            os.path.join(output_directory, f"test\\{batch_num}_test.pkl"), "wb"
         ) as f:
             pickle.dump(combined_graph, f)

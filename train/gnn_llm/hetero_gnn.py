@@ -5,7 +5,8 @@ import torch_geometric.nn as pyg_nn
 from torch_sparse import matmul
 
 train_args = {
-    "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    # "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    "device": "cpu",
     "hidden_size": 64,
     "epochs": 200,
     "weight_decay": 0.0002930387278908051,
