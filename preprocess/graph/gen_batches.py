@@ -58,9 +58,9 @@ def batch_generate(subgraph_ids, event_index, batch_size):
         for target_ids, neighbor_ids in tqdm(batch, desc="Generating batches"):
             graph = generate_subgraph(target_ids, neighbor_ids, event_index)
             graphs.append(graph)
-            return graphs
 
         # save batch
+        tqdm.write(f"Saving batch {i}...")
         save_batch(graphs, i)
         i += batch_size
 
