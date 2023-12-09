@@ -26,7 +26,7 @@ from hetero_gnn import HeteroGNN
 
 train_args = {
     # "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-    "device": "cpu",
+    "device": "cuda",
     "hidden_size": 81,
     "epochs": 100,
     "weight_decay": 0.00002203762357664057,
@@ -73,85 +73,102 @@ def test(model, graph):
     :param best_model: The current best model based on validation loss.
     :param best_val: The current best validation loss.
 
-    :return: A tuple containing the list of losses for each dataset, the best model, and the best validation loss. """
+    :return: A tuple containing the list of losses for each dataset, the best model, and the best validation loss.
+    """
 
     model.eval()  # Set the model to evaluation mode
 
-    # TODO: 
+    # TODO:
     preds = model(graph.node_feature, graph.edge_index)
 
     L1 = (
-            torch.sum(
-                torch.abs(
-                    preds["event_target"]
-                    - graph.node_target["event_target"]
-                )
-            )
-            / preds["event_target"].shape[0]
-        )
+        torch.sum(torch.abs(preds["event_target"] - graph.node_target["event_target"]))
+        / preds["event_target"].shape[0]
+    )
 
-    mse = torch.mean(torch.square(preds['event_target'] - graph.node_target['event_target']))
-    mape = torch.mean(torch.abs((preds['event_target'] - graph.node_target['event_target']) / graph.node_target['event_target']))
+    mse = torch.mean(
+        torch.square(preds["event_target"] - graph.node_target["event_target"])
+    )
+    mape = torch.mean(
+        torch.abs(
+            (preds["event_target"] - graph.node_target["event_target"])
+            / graph.node_target["event_target"]
+        )
+    )
 
     return (L1, mse, mape)
+
 
 def offload_from_device(hetero_graph):
     # Send node features to device
     for key in hetero_graph.node_feature:
-        hetero_graph.node_feature[key].to('cpu')
+        hetero_graph.node_feature[key].to("cpu")
 
     for key in hetero_graph.edge_index:
-        hetero_graph.edge_index[key].to('cpu')
+        hetero_graph.edge_index[key].to("cpu")
 
     for key in hetero_graph.node_target:
-        hetero_graph.node_target[key].to('cpu')
+        hetero_graph.node_target[key].to("cpu")
 
-def graph_tensors_to_device(hetero_graph):
-    for message_type in hetero_graph.message_types:
-        print("TYPE", message_type)
-        print("\t Feature", hetero_graph.num_node_features(message_type[0]))
-        print("\t Feature", hetero_graph.num_node_features(message_type[2]))
+
+def graph_tensors_to_device(hetero_graph, hetero_graph_cpu):
+    # G2 = nx.DiGraph()
+    # G2.add_node(1)
+    # G2.add_node(2)
+    # G2.add_edge(1, 2)
+    # hetero_graph = HeteroGraph(G=None)
+    # hetero_graph.node_feature = {}
+    # hetero_graph.edge_index = {}
+    # hetero_graph.node_target = {}
+
+    # for message_type in hetero_graph_cpu.message_types:
+    # print("TYPE", message_type)
+    # print("\t Feature", hetero_graph_cpu.num_node_features(message_type[0]))
+    # print("\t Feature", hetero_graph_cpu.num_node_features(message_type[2]))
 
     # Send node features to device
-    for key in hetero_graph.node_feature:
-        hetero_graph.node_feature[key] = hetero_graph.node_feature[key].to(
+    for key in hetero_graph_cpu.node_feature:
+        hetero_graph.node_feature[key] = hetero_graph_cpu.node_feature[key].to(
             train_args["device"]
         )
 
     # Create a torch.SparseTensor from edge_index and send it to device
-    for key in hetero_graph.edge_index:
-        print("KEY", key, type(key))
-        print(
-            "KEY NUMS",
-            key,
-            hetero_graph.num_nodes(key[0]),
-            hetero_graph.num_nodes(key[2]),
-        )
+    for key in hetero_graph_cpu.edge_index:
+        # print("KEY", key, type(key))
+        # print(
+        #     "KEY NUMS",
+        #     key,
+        #     hetero_graph_cpu.num_nodes(key[0]),
+        #     hetero_graph_cpu.num_nodes(key[2]),
+        # )
 
-        edge_index = hetero_graph.edge_index[key]
+        edge_index = hetero_graph_cpu.edge_index[key]
+        # print(list(edge_index))
 
-        print(
-            "MAX EDGES",
-            edge_index[0].max(),
-            edge_index[1].max(),
-            hetero_graph.num_nodes(key[0]),
-            hetero_graph.num_nodes(key[2]),
-        )
+        # print(
+        #     "MAX EDGES",
+        #     edge_index[0].max(),
+        #     edge_index[1].max(),
+        #     hetero_graph_cpu.num_nodes(key[0]),
+        #     hetero_graph_cpu.num_nodes(key[2]),
+        # )
         adj = SparseTensor(
             row=edge_index[0].long(),
             col=edge_index[1].long(),
             sparse_sizes=(
-                hetero_graph.num_nodes(key[0]),
-                hetero_graph.num_nodes(key[2]),
+                hetero_graph_cpu.num_nodes(key[0]),
+                hetero_graph_cpu.num_nodes(key[2]),
             ),
         )
         hetero_graph.edge_index[key] = adj.t().to(train_args["device"])
 
     # Send node targets to device
-    for key in hetero_graph.node_target:
-        hetero_graph.node_target[key] = hetero_graph.node_target[key].to(
+    for key in hetero_graph_cpu.node_target:
+        hetero_graph.node_target[key] = hetero_graph_cpu.node_target[key].to(
             train_args["device"]
         )
+
+    return hetero_graph
 
 
 def create_split(hetero_graph):
@@ -280,13 +297,21 @@ def hyper_parameter_tuning(hetero_graph):
         print(f"    {key}: {value}")
 
 
-def train_model(hetero_graph, train_batches, val_batches, test_batches): 
-
+def train_model(
+    hetero_graph,
+    train_batches,
+    val_batches,
+    test_batches,
+    train_batches_cpu,
+    val_batches_cpu,
+    test_batches_cpu,
+):
     hetero_graph = train_batches[0]
-    graph_tensors_to_device(hetero_graph)
+    hetero_graph_cpu = train_batches_cpu[0]
+    hetero_graph_gpu = graph_tensors_to_device(hetero_graph, hetero_graph_cpu)
 
     model = HeteroGNN(
-        hetero_graph,
+        hetero_graph_gpu,
         train_args,
         num_layers=train_args["num_layers"],
         aggr=train_args["aggr"],
@@ -299,44 +324,45 @@ def train_model(hetero_graph, train_batches, val_batches, test_batches):
 
     best_loss = float("inf")
     for epoch in range(train_args["epochs"]):
-
         train_losses = np.zeros(4)
 
-        for train_batch in train_batches:
-            if train_batch != train_batches[0]:
-                graph_tensors_to_device(train_batch)
+        for train_batch, train_batch_cpu in zip(train_batches, train_batches_cpu):
+            # if train_batch != train_batches[0] and epoch == 0 or True:
+            train_batch_gpu = graph_tensors_to_device(train_batch, train_batch_cpu)
+            
+            
+            
+            model.hetero_graph = train_batch_gpu
 
-            model.hetero_graph = train_batch
-
-
-            loss_train = train(model, optimizer, train_batch)
+            loss_train = train(model, optimizer, train_batch_gpu)
             (L1_train, mse_train, mape_train) = test(model, model.hetero_graph)
 
-            train_losses += np.array([loss_train, L1_train.item(), mse_train.item(), mape_train.item()])
+            train_losses += np.array(
+                [loss_train, L1_train.item(), mse_train.item(), mape_train.item()]
+            )
 
-            offload_from_device(train_batch)
+            # offload_from_device(train_batch_gpu)
 
         train_losses /= len(train_batches)
 
         val_losses = np.zeros(3)
 
-        for val_batch in val_batches:
+        for val_batch, val_batch_cpu in zip(val_batches, val_batches_cpu):
+            # if epoch == 0 or True:
+            val_batch_gpu = graph_tensors_to_device(val_batch, val_batch_cpu)
 
-            graph_tensors_to_device(val_batch)
-
-            model.hetero_graph = val_batch
+            model.hetero_graph = val_batch_gpu
 
             # test val
             (L1_val, mse_val, mape_val) = test(model, model.hetero_graph)
             val_losses += np.array([L1_val.item(), mse_val.item(), mape_val.item()])
 
-            offload_from_device(val_batch)
-
+            # offload_from_device(val_batch_gpu)
 
         val_losses /= len(val_batches)
 
         ## CHANGE THIS IF YOU WANT DIFFERENT EVALUATION METRIC
-        if (val_losses[0] < best_loss):
+        if val_losses[0] < best_loss:
             best_loss = val_losses[0]
             torch.save(model.state_dict(), "./best_model.pkl")
 
@@ -355,7 +381,7 @@ def train_model(hetero_graph, train_batches, val_batches, test_batches):
     # )
     #
     #
-    
+
     # model = HeteroGNN(
     #     hetero_graph,
     #     train_args,
@@ -377,6 +403,7 @@ def train_model(hetero_graph, train_batches, val_batches, test_batches):
     # display_predictions(preds, hetero_graph, test_idx)
     #
 
+
 def display_predictions(preds, hetero_graph, test_idx):
     for i in range(test_idx["event"].shape[0]):
         if hetero_graph.node_target["event"][test_idx["event"]][i] != -1:
@@ -391,40 +418,46 @@ def get_batches_from_pickle(folder_path):
     pickle_files = os.listdir(folder_path)
 
     batches = []
+    cpu_batches = []
 
     for file_name in pickle_files:
         file_path = os.path.join(folder_path, file_name)
         print(file_path)
         with open(file_path, "rb") as f:
             G = pickle.load(f)
-
+        with open(file_path, "rb") as f:
+            G_cpu = pickle.load(f)
         hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
+        hetero_graph_cpu = HeteroGraph(G_cpu, netlib=nx, directed=True)
         # graph_tensors_to_device(hetero_graph)
         batches.append(hetero_graph)
+        cpu_batches.append(hetero_graph_cpu)
 
-    return batches
+    return batches, cpu_batches
 
 
-def get_hetero_graph_dataset(folder_path):
-    pickle_files = os.listdir(folder_path)
+# def get_hetero_graph_dataset(folder_path):
+#     pickle_files = os.listdir(folder_path)
 
-    subgraphs = []
+#     subgraphs = []
+#     cpu_subgraphs = []
 
-    for file_name in pickle_files:
-        file_path = os.path.join(folder_path, file_name)
-        print(file_path)
-        with open(file_path, "rb") as f:
-            G = pickle.load(f)
+#     for file_name in pickle_files:
+#         file_path = os.path.join(folder_path, file_name)
+#         print(file_path)
+#         with open(file_path, "rb") as f:
+#             G = pickle.load(f)
 
-        for node in G.nodes():
-            G.nodes[node]["node_label"] = 1
+#         for node in G.nodes():
+#             G.nodes[node]["node_label"] = 1
 
-        hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
-        subgraphs.append(hetero_graph)
+#         hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
+#         subgraphs.append(hetero_graph)
+#         cpu_subgraphs.append(HeteroGraph(copy.deepcopy(G), netlib=nx, directed=True))
 
-    dataset = GraphDataset(subgraphs, task="node")
+#     dataset = GraphDataset(subgraphs, task="node")
 
-    return dataset
+#     return dataset
 
 
 if __name__ == "__main__":
@@ -441,10 +474,16 @@ if __name__ == "__main__":
 
     output_directory = "../../data/graphs/batches/"
     # batches = get_batches_from_pickle('../../data/graphs/neighborhood_sampling')
-    train_batches = get_batches_from_pickle(os.path.join(output_directory, "train"))
-    test_batches = get_batches_from_pickle(os.path.join(output_directory, "test"))
-    val_batches = get_batches_from_pickle(os.path.join(output_directory, "val"))
-    
+    train_batches, train_batches_cpu = get_batches_from_pickle(
+        os.path.join(output_directory, "train")
+    )
+    test_batches, test_batches_cpu = get_batches_from_pickle(
+        os.path.join(output_directory, "test")
+    )
+    val_batches, val_batches_cpu = get_batches_from_pickle(
+        os.path.join(output_directory, "val")
+    )
+
     # Load the heterogeneous graph data
 
     # with open("./1_concepts_similar_llm.pkl", "rb") as f:
@@ -460,4 +499,12 @@ if __name__ == "__main__":
     if args.mode == "tune":
         hyper_parameter_tuning(hetero_graph)
     if args.mode == "train":
-        train_model(hetero_graph, train_batches, val_batches, test_batches)
+        train_model(
+            hetero_graph,
+            train_batches,
+            val_batches,
+            test_batches,
+            train_batches_cpu,
+            val_batches_cpu,
+            test_batches_cpu,
+        )

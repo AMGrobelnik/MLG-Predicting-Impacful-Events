@@ -6,7 +6,7 @@ from torch_sparse import matmul
 
 train_args = {
     # "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-    "device": "cpu",
+    "device": "cuda",
     "hidden_size": 64,
     "epochs": 200,
     "weight_decay": 0.0002930387278908051,
@@ -150,7 +150,7 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
             out = self.alpha.reshape(-1, 1, 1) * xs
             out = torch.sum(out, dim=0)
             return out
-        
+
         raise ValueError(f"Invalid aggr {self.aggr}, valid options: (mean, attn)")
 
 
@@ -190,7 +190,15 @@ def generate_convs(hetero_graph, conv, hidden_size, first_layer=False):
 
 
 class HeteroGNN(torch.nn.Module):
-    def __init__(self, hetero_graph, args, num_layers, aggr="mean", return_embedding=False, mask_unknown=True):
+    def __init__(
+        self,
+        hetero_graph,
+        args,
+        num_layers,
+        aggr="mean",
+        return_embedding=False,
+        mask_unknown=True,
+    ):
         """
         Initializes the HeteroGNN instance.
         :param hetero_graph: The heterogeneous graph for which convolutions are to be created.
@@ -218,9 +226,12 @@ class HeteroGNN(torch.nn.Module):
         for i in range(self.num_layers):
             first_layer = i == 0
             conv = HeteroGNNWrapperConv(
-                    generate_convs(hetero_graph, HeteroGNNConv, self.hidden_size, first_layer),
-                    args,
-                    self.aggr)
+                generate_convs(
+                    hetero_graph, HeteroGNNConv, self.hidden_size, first_layer
+                ),
+                args,
+                self.aggr,
+            )
             self.convs.append(conv)
 
         # Initialize batch normalization and ReLU layers for each layer and node type
