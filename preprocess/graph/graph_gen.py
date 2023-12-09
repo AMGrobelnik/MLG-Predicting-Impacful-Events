@@ -361,10 +361,10 @@ def get_referenced_ids(n_files: int):
     return e_ids, c_ids
 
 
-n = 3000
+n = 4
 concepts = True
 similar = True
-llm_embeddings = False
+llm_embeddings = True
 
 remove_isolates = True
 remove_future = True
@@ -372,7 +372,7 @@ future_threshold = 2
 no_unknown = True
 count_feature = False  # include article counts in the node features
 
-if __name__ == "__main__":
+def main():
     start_time = pd.Timestamp.now()
     graph = generate_graph(n, concepts, similar, llm_embeddings, no_unknown)
 
@@ -403,3 +403,7 @@ if __name__ == "__main__":
     end_time = pd.Timestamp.now()
     print(f"Time taken: {round((end_time - start_time).seconds / 60, 2)} min")
     print_graph_statistics(graph)
+
+
+if __name__ == "__main__":
+    main()
