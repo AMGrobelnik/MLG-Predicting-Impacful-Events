@@ -223,7 +223,7 @@ def objective(
     # Initialize wandb run
     aggr = trial.suggest_categorical("aggr", ["mean", "attn"])
     wandb.init(
-        project="V10_MLG_PredEvents_GNN+LMM",
+        project="V11_MLG_PredEvents_GNN+LMM",
         entity="mlg-events",
         dir=None,
         config={
@@ -318,20 +318,22 @@ def objective(
                 "val_mse": val_losses[1],
                 "val_l1": val_losses[0],
                 "val_mape": val_losses[2],
-                "epoch": epoch,
+                # "epoch": epoch,
                 "train_loss": train_losses[0],
             }
         )
 
-    print(f"Best model: Epoch {best_epoch}, Metric Val Loss: {best_loss:.1f}")
-    
+    print(f"Best model: Epoch {best_epoch}, Best Metric Val Loss: {best_loss:.1f}")
+    wandb.log({
+    "best_metric_val_loss": best_loss
+    })
     ## TEST
 
     model = HeteroGNN(
         hetero_graph_gpu,
-        train_args,
-        num_layers=train_args["num_layers"],
-        aggr=train_args["aggr"],
+        config,
+        num_layers=config["num_layers"],
+        aggr=config["aggr"],
     ).to(train_args["device"])
 
     model.load_state_dict(torch.load("./best_model.pkl"))
@@ -536,7 +538,7 @@ def train_model(
             """
         )
 
-    print(f"""Best model: Epoch {best_epoch}, Metric Val Loss: {best_loss:.1f}""")
+    print(f"""Best model: Epoch {best_epoch}, Best Metric Val Loss: {best_loss:.1f}""")
 
     ## TEST
 
