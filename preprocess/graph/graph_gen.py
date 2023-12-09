@@ -46,7 +46,7 @@ def get_event_attributes(
         else:
             if not is_similar:
                 tqdm.write(f"WARNING: LLM not found for {uri}")
-            feature_tensor = torch.cat((feature_tensor, torch.zeros(768 * 1)))
+            feature_tensor = torch.cat((feature_tensor, torch.zeros(embedding_dim * 1)))
 
     if count_feature:
         feature_tensor = torch.cat(
@@ -76,7 +76,7 @@ def get_concept_attributes(c: dict) -> dict:
 def get_concepts(event_id: str, concepts: dict):
     nodes = [(c["id"], get_concept_attributes(c)) for c in concepts]
     edges = [
-        (event_id, c["id"], {"edge_type": "related"}) # , "weight": c["score"]
+        (event_id, c["id"], {"edge_type": "related"})  # , "weight": c["score"]
         for c in concepts
     ]
 
@@ -90,7 +90,7 @@ def get_similar_events(
         (se["uri"], get_event_attributes(se, True, llm_df)) for se in similar_events
     ]
     edges = [
-        (event_id, se["uri"], {"edge_type": "similar"}) # , "weight": se["sim"]
+        (event_id, se["uri"], {"edge_type": "similar"})  # , "weight": se["sim"]
         for se in similar_events
     ]
 
@@ -99,7 +99,7 @@ def get_similar_events(
 
 def load_llm_embeddings(file: str):
     file_name = file.split("/")[-1]
-    df = pd.read_pickle(f"../../data/text/embedded/{file_name}")
+    df = pd.read_pickle(f"../../data/text/{embedded_directory}/{file_name}")
     return df
 
 
@@ -225,7 +225,7 @@ def add_concept_features(graph: nx.Graph, llm_embeddings: bool):
 
         # add features to the graph, one embedding file at a time
         for file in tqdm(file_to_ids.keys(), desc="Iterating concept files", ncols=100):
-            embeds = pickle.load(open(f"../../data/text/concept_embeds/{file}", "rb"))
+            embeds = pickle.load(open(f"../../data/text/{concept_embeds_filename}/{file}", "rb"))
             for node in file_to_ids[file]:
                 degree = graph.degree(node)
                 llm = torch.tensor(embeds.loc[node]["label"], dtype=torch.float32)
@@ -240,6 +240,11 @@ def add_concept_features(graph: nx.Graph, llm_embeddings: bool):
             degree = graph.degree(node)
             features = torch.tensor([degree], dtype=torch.float32)
             graph.nodes[node]["node_feature"] = features
+
+    # add self loops to concepts
+    for node in tqdm(graph.nodes(), desc="Adding self loops", ncols=100):
+        if graph.nodes[node]["node_type"] == "concept":
+            graph.add_edge(node, node, edge_type="related")
 
 
 def prune_disconnected(graph: nx.Graph):
@@ -259,7 +264,7 @@ def remove_future_edges(graph: nx.Graph, threshold: int):
     for u, v, data in tqdm(graph.edges(data=True), desc="Removing future", ncols=100):
         if data["edge_type"] == "related":
             # remove event -> concept edges
-            if u.startswith('e'):
+            if u.startswith("e"):
                 to_remove.append((u, v))
         else:
             d1 = graph.nodes[u]["node_feature"][0]
@@ -356,16 +361,20 @@ def get_referenced_ids(n_files: int):
     return e_ids, c_ids
 
 
-n = 3000
+n = 1
 concepts = True
 similar = True
-llm_embeddings = False
+llm_embeddings = True
 
 remove_isolates = True
 remove_future = True
 future_threshold = 2
-no_unknown = True
+no_unknown = False
 count_feature = False  # include article counts in the node features
+
+embedded_directory = "embedded_umap"
+concept_embeds_filename = "concept_embeds_umap"
+embedding_dim = 50
 
 if __name__ == "__main__":
     start_time = pd.Timestamp.now()
@@ -398,4 +407,3 @@ if __name__ == "__main__":
     end_time = pd.Timestamp.now()
     print(f"Time taken: {round((end_time - start_time).seconds / 60, 2)} min")
     print_graph_statistics(graph)
-

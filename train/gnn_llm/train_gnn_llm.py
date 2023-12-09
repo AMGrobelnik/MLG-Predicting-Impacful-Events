@@ -89,36 +89,14 @@ def test(model, graph, indices, best_model, best_tvt_scores):
         mask = graph.node_target["event"][idx, 0] != -1
         non_zero_idx = torch.masked_select(idx, mask)
 
-        L1 = (
-            torch.sum(
-                torch.abs(
-                    preds["event"][non_zero_idx]
-                    - graph.node_target["event"][non_zero_idx]
-                )
-            )
-            / non_zero_idx.shape[0]
-        )
-
-        meanRelative = (
-            torch.sum(
-                torch.abs(
-                    (
-                        preds["event"][non_zero_idx]
-                        - graph.node_target["event"][non_zero_idx]
-                    )
-                    / graph.node_target["event"][non_zero_idx]
-                )
-            )
-            / non_zero_idx.shape[0]
-        )
-
+        L1 = torch.mean(torch.abs(preds["event"][non_zero_idx]- graph.node_target["event"][non_zero_idx]))
         mse = torch.mean(torch.square(preds['event'][non_zero_idx] - graph.node_target['event'][non_zero_idx]))
         mape = torch.mean(torch.abs((preds['event'][non_zero_idx] - graph.node_target['event'][non_zero_idx]) / graph.node_target['event'][non_zero_idx]))
 
         tvt_scores.append((mse, L1, mape))
 
     # Update the best model and validation loss if the current model performs better
-    if tvt_scores[1][0] < best_tvt_scores[1][0]:
+    if tvt_scores[1][1] < best_tvt_scores[1][1]:
         best_tvt_scores = tvt_scores
         # torch.to_pickle(model, 'best_model.pkl')
         # model.to_pickle('best_model.pkl')
@@ -317,6 +295,7 @@ def train_model(hetero_graph):
         num_layers=train_args["num_layers"],
         aggr=train_args["aggr"],
         return_embedding=False,
+        mask_unknown=True
     ).to(train_args["device"])
 
     train_idx, val_idx, test_idx = create_split(hetero_graph)
@@ -338,16 +317,16 @@ def train_model(hetero_graph):
         )
         print(
             f"""Epoch: {epoch} Loss: {loss:.4f}
-            Train: Mse={cur_tvt_scores[0][0].item():.4f} L1={cur_tvt_scores[0][0].item():.4f} Mape={cur_tvt_scores[0][2].item():.4f}
-            Val: Mse={cur_tvt_scores[0][0].item():.4f} L1={cur_tvt_scores[1][1].item():.4f} Mape={cur_tvt_scores[0][2].item():.4f}
-            Test: Mse={cur_tvt_scores[0][0].item():.4f} L1={cur_tvt_scores[2][1].item():.4f} Mape={cur_tvt_scores[0][2].item():.4f}"""
+            Train: Mse={cur_tvt_scores[0][0].item():.4f} L1={cur_tvt_scores[0][1].item():.4f} Mape={cur_tvt_scores[0][2].item():.4f}
+            Val: Mse={cur_tvt_scores[1][0].item():.4f} L1={cur_tvt_scores[1][1].item():.4f} Mape={cur_tvt_scores[1][2].item():.4f}
+            Test: Mse={cur_tvt_scores[2][0].item():.4f} L1={cur_tvt_scores[2][1].item():.4f} Mape={cur_tvt_scores[2][2].item():.4f}"""
         )
 
     print(
         f"""Best model: {epoch} Loss: {loss:.4f}
-        Train: Mse={best_tvt_scores[0][0].item():.4f} L1={best_tvt_scores[0][0].item():.4f} Mape={best_tvt_scores[0][2].item():.4f}
-        Val: Mse={best_tvt_scores[0][0].item():.4f} L1={best_tvt_scores[1][1].item():.4f} Mape={best_tvt_scores[0][2].item():.4f}
-        Test: Mse={best_tvt_scores[0][0].item():.4f} L1={best_tvt_scores[2][1].item():.4f} Mape={best_tvt_scores[0][2].item():.4f}"""
+        Train: Mse={cur_tvt_scores[0][0].item():.4f} L1={cur_tvt_scores[0][1].item():.4f} Mape={cur_tvt_scores[0][2].item():.4f}
+        Val: Mse={cur_tvt_scores[1][0].item():.4f} L1={cur_tvt_scores[1][1].item():.4f} Mape={cur_tvt_scores[1][2].item():.4f}
+        Test: Mse={cur_tvt_scores[2][0].item():.4f} L1={cur_tvt_scores[2][1].item():.4f} Mape={cur_tvt_scores[2][2].item():.4f}"""
     )
 
     model = HeteroGNN(
@@ -391,15 +370,21 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load the heterogeneous graph data
-    with open("./1_concepts_similar_llm_noIsolates.pkl", "rb") as f:
+    with open("./1_concepts_similar_llm_noFutureThr2_noIsolates.pkl", "rb") as f:
         G = pickle.load(f)
+        
+    # for n in G.nodes(data=True):
+    #     if n[1]['node_feature'].shape[0] != 101:
+    #         print("DIMA", n[0], n[1]['node_feature'].shape)
 
     # Create a HeteroGraph object from the networkx graph
     hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
 
+    print("DIM: ", hetero_graph.node_feature['event'][0].shape)
+
     # Send all the necessary tensors to the same device
     graph_tensors_to_device(hetero_graph)
-
+    args.mode = 'train'
     if args.mode == "tune":
         hyper_parameter_tuning(hetero_graph)
     if args.mode == "train":
