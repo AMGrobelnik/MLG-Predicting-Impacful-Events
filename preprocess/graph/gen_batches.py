@@ -114,9 +114,7 @@ def load_files(files_to_idx):
     :param files_to_idx: maps file names -> event ids
     :return:
     """
-    if src_files is not None:
-        return src_files
-    else:
+    if src_files is None:
         src_files = {}
 
     for file_name in files_to_idx.keys():
