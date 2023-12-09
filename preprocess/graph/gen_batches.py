@@ -106,14 +106,21 @@ def load_concept_llm_files():
     return llm_files
 
 
+src_files = None
 def load_files(files_to_idx):
+    global src_files
     """
     Loads files into memory
     :param files_to_idx: maps file names -> event ids
     :return:
     """
+    if src_files is not None:
+        return src_files
+
     src_files = {}
     for file_name in files_to_idx.keys():
+        if file_name in src_files:
+            continue
         with open(f"../../data/preprocessed/{file_name}.pkl", "rb") as f:
             file = pickle.load(f)
             src_files[file_name] = file
