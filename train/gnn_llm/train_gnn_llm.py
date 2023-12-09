@@ -29,7 +29,7 @@ train_args = {
     # "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     "device": "cuda",
     "hidden_size": 81,
-    "epochs": 100,
+    "epochs": 10,
     "weight_decay": 0.00002203762357664057,
     "lr": 0.003873757421883433,
     "attn_size": 48,
@@ -303,9 +303,9 @@ def objective(
             torch.save(model.state_dict(), "./best_model.pkl")
 
         print(
-            f"""Epoch: {epoch} Loss: {train_losses[0]:.4f}
-            Train: Mse={train_losses[2]:.4f} L1={train_losses[1]:.4f} Mape={train_losses[3]:.4f}
-            Val: Mse={val_losses[1]:.4f} L1={val_losses[0]:.4f} Mape={val_losses[2]:.4f}
+            f"""Epoch: {epoch} Backprop_Loss: {train_losses[0]:.1f}
+            Train: Mse={train_losses[2]:.1f} L1={train_losses[1]:.1f} Mape={train_losses[3]:.1f}
+            Val: Mse={val_losses[1]:.1f} L1={val_losses[0]:.1f} Mape={val_losses[2]:.1f}
             """
         )
 
@@ -323,8 +323,53 @@ def objective(
             }
         )
 
-    print(f"Best model: Epoch {best_epoch}, Loss: {best_loss:.4f}")
+    print(f"Best model: Epoch {best_epoch}, Metric Val Loss: {best_loss:.1f}")
+    
+    ## TEST
 
+    model = HeteroGNN(
+        hetero_graph_gpu,
+        train_args,
+        num_layers=train_args["num_layers"],
+        aggr=train_args["aggr"],
+    ).to(train_args["device"])
+
+    model.load_state_dict(torch.load("./best_model.pkl"))
+
+    test_losses = np.zeros(3)
+    
+    for test_batch, test_batch_cpu in zip(test_batches, test_batches_cpu):
+        # if epoch == 0 or True:
+        test_batch_gpu = graph_tensors_to_device(test_batch, test_batch_cpu)
+
+        model.hetero_graph = test_batch_gpu
+
+        # test
+        (L1_test, mse_test, mape_test) = test(model, model.hetero_graph)
+        test_losses += np.array([L1_test.item(), mse_test.item(), mape_test.item()])
+
+        preds = model(hetero_graph.node_feature, hetero_graph.edge_index)
+        
+        display_predictions(preds, hetero_graph)
+
+    # cur_tvt_scores, best_tvt_scores, best_model = test(
+    #     model, hetero_graph, [train_idx, val_idx, test_idx], best_model, best_tvt_scores
+    # )
+    test_losses /= len(test_batches)
+
+    # Print the test losses
+    print(
+        f"""Test Losses: 
+        Mse={test_losses[1]:.1f} L1={test_losses[0]:.1f} Mape={test_losses[2]:.1f}
+        """
+    )
+    
+    wandb.log({
+    "test_l1_loss": test_losses[0],
+    "test_mse_loss": test_losses[1],
+    "test_mape_loss": test_losses[2]
+    })
+    
     # Finish wandb run
     wandb.finish()
 
@@ -360,7 +405,7 @@ def objective(
     #     )
 
     #     print(
-    #         f"Epoch {epoch} Loss {train_loss:.4f} Current Train,Val,Test Scores {[score.item() for score in cur_tvt_scores]}"
+    #         f"Epoch {epoch} Loss {train_loss:.1f} Current Train,Val,Test Scores {[score.item() for score in cur_tvt_scores]}"
     #     )
 
     #     # Log metrics to wandb
@@ -441,9 +486,10 @@ def train_model(
     )
 
     best_loss = float("inf")
+    best_epoch =0
     for epoch in range(train_args["epochs"]):
         train_losses = np.zeros(4)
-        
+
         for train_batch, train_batch_cpu in zip(train_batches, train_batches_cpu):
             # if train_batch != train_batches[0] and epoch == 0 or True:
             train_batch_gpu = graph_tensors_to_device(train_batch, train_batch_cpu)
@@ -480,55 +526,71 @@ def train_model(
         ## CHANGE THIS IF YOU WANT DIFFERENT EVALUATION METRIC
         if val_losses[0] < best_loss:
             best_loss = val_losses[0]
+            best_epoch = epoch
             torch.save(model.state_dict(), "./best_model.pkl")
 
         print(
-            f"""Epoch: {epoch} Loss: {train_losses[0]:.4f}
-            Train: Mse={train_losses[2]:.4f} L1={train_losses[1]:.4f} Mape={train_losses[3]:.4f}
-            Val: Mse={val_losses[1]:.4f} L1={val_losses[0]:.4f} Mape={val_losses[2]:.4f}
+            f"""Epoch: {epoch} Backprop_Loss: {train_losses[0]:.1f}
+            Train: Mse={train_losses[2]:.1f} L1={train_losses[1]:.1f} Mape={train_losses[3]:.1f}
+            Val: Mse={val_losses[1]:.1f} L1={val_losses[0]:.1f} Mape={val_losses[2]:.1f}
             """
         )
-    #
-    print(f"Best model: Epoch {epoch}, Loss: {best_loss:.4f}")
-    # print(
-    #     f"""Best model: {epoch} Loss: {loss:.4f}
-    #     Train: Mse={best_tvt_scores[0][0].item():.4f} L1={best_tvt_scores[0][0].item():.4f} Mape={best_tvt_scores[0][2].item():.4f}
-    #     Val: Mse={best_tvt_scores[0][0].item():.4f} L1={best_tvt_scores[1][1].item():.4f} Mape={best_tvt_scores[0][2].item():.4f}
-    #     Test: Mse={best_tvt_scores[0][0].item():.4f} L1={best_tvt_scores[2][1].item():.4f} Mape={best_tvt_scores[0][2].item():.4f}"""
-    # )
-    #
-    #
 
-    # model = HeteroGNN(
-    #     hetero_graph,
-    #     train_args,
-    #     num_layers=train_args["num_layers"],
-    #     aggr=train_args["aggr"],
-    # ).to(train_args["device"])
-    #
-    # model.load_state_dict(torch.load("./best_model.pkl"))
-    #
-    #
-    # ## TEST
-    #
-    # preds = model(hetero_graph.node_feature, hetero_graph.edge_index)
-    #
+    print(f"""Best model: Epoch {best_epoch}, Metric Val Loss: {best_loss:.1f}""")
+
+    ## TEST
+
+    model = HeteroGNN(
+        hetero_graph_gpu,
+        train_args,
+        num_layers=train_args["num_layers"],
+        aggr=train_args["aggr"],
+    ).to(train_args["device"])
+
+    model.load_state_dict(torch.load("./best_model.pkl"))
+
+    test_losses = np.zeros(3)
+    
+    
+    for test_batch, test_batch_cpu in zip(test_batches, test_batches_cpu):
+        # if epoch == 0 or True:
+        test_batch_gpu = graph_tensors_to_device(test_batch, test_batch_cpu)
+
+        model.hetero_graph = test_batch_gpu
+
+        # test
+        (L1_test, mse_test, mape_test) = test(model, model.hetero_graph)
+        test_losses += np.array([L1_test.item(), mse_test.item(), mape_test.item()])
+
+        preds = model(hetero_graph.node_feature, hetero_graph.edge_index)
+        
+        display_predictions(preds, hetero_graph)
+
     # cur_tvt_scores, best_tvt_scores, best_model = test(
     #     model, hetero_graph, [train_idx, val_idx, test_idx], best_model, best_tvt_scores
     # )
-    #
-    # display_predictions(preds, hetero_graph, test_idx)
-    #
+    test_losses /= len(test_batches)
+
+    # Print the test losses
+    print(
+        f"""Test Losses: 
+        Mse={test_losses[1]:.1f} L1={test_losses[0]:.1f} Mape={test_losses[2]:.1f}
+        """
+    )
 
 
-def display_predictions(preds, hetero_graph, test_idx):
-    for i in range(test_idx["event"].shape[0]):
-        if hetero_graph.node_target["event"][test_idx["event"]][i] != -1:
-            print(
-                i,
-                preds["event"][test_idx["event"]][i],
-                hetero_graph.node_target["event"][test_idx["event"]][i],
-            )
+
+def display_predictions(preds, hetero_graph):
+    print("Index | Predicted Value | Actual Value | Difference")
+    print("-" * 70)  # Adjust the length of the separator line
+
+    for i in range(hetero_graph.node_target["event_target"].shape[0]):
+        predicted_value = round(preds["event_target"][i].item(), 2)
+        actual_value = round(hetero_graph.node_target["event_target"][i].item(), 2)
+        difference = round(abs(predicted_value - actual_value), 2)  # Calculate and round the absolute difference
+
+        print(f"{i:<6} | {predicted_value:<16} | {actual_value:<13} | {difference:<10}")
+
 
 
 def get_batches_from_pickle(folder_path):
