@@ -42,7 +42,7 @@ for i in tqdm(range(0, len(pickle_files), batch_size), desc="Processing Batches"
             combined_graph = nx.compose(combined_graph, current_graph)
             # Choose 10 random nodes of type 'event'
             event_nodes = get_nodes_by_type(combined_graph, "event")
-            selected_nodes = random.sample(event_nodes, min(100, len(event_nodes)))
+            selected_nodes = random.sample(event_nodes, min(1000, len(event_nodes)))
             for node in selected_nodes:
                 if combined_graph.in_degree(node) > 1:
                     print("INDEGREE IS VALID")

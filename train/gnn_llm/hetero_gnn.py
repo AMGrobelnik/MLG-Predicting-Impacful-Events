@@ -293,8 +293,13 @@ class HeteroGNN(torch.nn.Module):
 
         loss = 0
         loss_func = torch.nn.MSELoss()
-
-        loss += loss_func(preds["event_target"], y["event_target"])
+        
+        # print("PRED LOSS TRAIN")
+        # print(preds["event_target"])
+        # print(preds["event_target"].shape)
+        mse = torch.mean(torch.square(preds["event_target"] - y["event_target"]))
+        loss = mse
+        # loss += loss_func(preds["event_target"], y["event_target"])
 
         #
         # if self.mask_unknown:

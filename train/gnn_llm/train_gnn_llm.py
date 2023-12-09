@@ -21,6 +21,7 @@ import networkx as nx
 import wandb
 import optuna
 import argparse
+from multiprocessing.pool import ThreadPool
 
 from hetero_gnn import HeteroGNN
 
@@ -49,7 +50,7 @@ def train(model, optimizer, train_graph):
     :return: The training loss as a float.
     """
 
-    model.train()  # Set the model to training mode
+    # model.train()  # Set the model to training mode
     optimizer.zero_grad()  # Zero out any existing gradients
 
     preds = model(train_graph.node_feature, train_graph.edge_index)
@@ -86,6 +87,9 @@ def test(model, graph):
         / preds["event_target"].shape[0]
     )
 
+    # print("PRED LOSS EVAL")
+    # print(preds["event_target"])
+    # print(preds["event_target"].shape)
     mse = torch.mean(
         torch.square(preds["event_target"] - graph.node_target["event_target"])
     )
@@ -207,86 +211,201 @@ def display_results(best_model):
     raise NotImplementedError()
 
 
-def objective(trial, hetero_graph, train_idx, val_idx, test_idx):
-    aggr_method = trial.suggest_categorical("aggr", ["mean", "attn"])
-    attn_size = trial.suggest_int("attn_size", 16, 128) if aggr_method == "attn" else 32
-
+def objective(
+    trial,
+    train_batches,
+    val_batches,
+    test_batches,
+    train_batches_cpu,
+    val_batches_cpu,
+    test_batches_cpu,
+):
     # Initialize wandb run
+    aggr = trial.suggest_categorical("aggr", ["mean", "attn"])
     wandb.init(
-        project="V6_MLG_PredEvents_GNN+LMM",
+        project="V10_MLG_PredEvents_GNN+LMM",
         entity="mlg-events",
         dir=None,
         config={
             "lr": trial.suggest_float("lr", 1e-5, 1e-1, log=True),
             "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True),
             "hidden_size": trial.suggest_int("hidden_size", 16, 128),
-            "attn_size": attn_size,  # Fixed value
+            "attn_size": trial.suggest_int("attn_size", 16, 128)
+            if aggr == "attn"
+            else 32,
             "epochs": trial.suggest_int("epochs", 150, 300),
             "num_layers": trial.suggest_int("num_layers", 1, 10),
-            "aggr": aggr_method,
+            "aggr": aggr,
         },
     )
 
     # Use wandb config
     config = wandb.config
 
-    # Initialize the model with the new hyperparameters
+    hetero_graph = train_batches[0]
+    hetero_graph_cpu = train_batches_cpu[0]
+    hetero_graph_gpu = graph_tensors_to_device(hetero_graph, hetero_graph_cpu)
+
     model = HeteroGNN(
-        hetero_graph,
-        {
-            "hidden_size": config.hidden_size,
-            "attn_size": config.attn_size,
-            "device": train_args["device"],
-        },
-        num_layers=config.num_layers,
-        aggr=config.aggr,
+        hetero_graph_gpu,
+        config,
+        num_layers=config["num_layers"],
+        aggr=config["aggr"],
+        return_embedding=False,
     ).to(train_args["device"])
+
     optimizer = torch.optim.Adam(
-        model.parameters(), lr=config.lr, weight_decay=config.weight_decay
+        model.parameters(), lr=config["lr"], weight_decay=config["weight_decay"]
     )
 
-    # Initialize best scores with infinity
-    best_tvt_scores = (float("inf"), float("inf"), float("inf"))
+    best_loss = float("inf")
+    best_epoch = -1
+    for epoch in range(config["epochs"]):
+        train_losses = np.zeros(4)
 
-    # Training loop
-    for epoch in range(config.epochs):
-        train_loss = train(model, optimizer, hetero_graph, train_idx)
-        cur_tvt_scores, best_tvt_scores, _ = test(
-            model, hetero_graph, [train_idx, val_idx, test_idx], None, best_tvt_scores
-        )
+        for train_batch, train_batch_cpu in zip(train_batches, train_batches_cpu):
+            # if train_batch != train_batches[0] and epoch == 0 or True:
+            train_batch_gpu = graph_tensors_to_device(train_batch, train_batch_cpu)
+
+            model.hetero_graph = train_batch_gpu
+
+            loss_train = train(model, optimizer, train_batch_gpu)
+            (L1_train, mse_train, mape_train) = test(model, model.hetero_graph)
+
+            train_losses += np.array(
+                [loss_train, L1_train.item(), mse_train.item(), mape_train.item()]
+            )
+
+            # offload_from_device(train_batch_gpu)
+
+        train_losses /= len(train_batches)
+
+        val_losses = np.zeros(3)
+
+        for val_batch, val_batch_cpu in zip(val_batches, val_batches_cpu):
+            # if epoch == 0 or True:
+            val_batch_gpu = graph_tensors_to_device(val_batch, val_batch_cpu)
+
+            model.hetero_graph = val_batch_gpu
+
+            # test val
+            (L1_val, mse_val, mape_val) = test(model, model.hetero_graph)
+            val_losses += np.array([L1_val.item(), mse_val.item(), mape_val.item()])
+
+            # offload_from_device(val_batch_gpu)
+
+        val_losses /= len(val_batches)
+
+        ## CHANGE THIS IF YOU WANT DIFFERENT EVALUATION METRIC
+        if val_losses[0] < best_loss:
+            best_epoch = epoch
+            best_loss = val_losses[0]
+            torch.save(model.state_dict(), "./best_model.pkl")
 
         print(
-            f"Epoch {epoch} Loss {train_loss:.4f} Current Train,Val,Test Scores {[score.item() for score in cur_tvt_scores]}"
+            f"""Epoch: {epoch} Loss: {train_losses[0]:.4f}
+            Train: Mse={train_losses[2]:.4f} L1={train_losses[1]:.4f} Mape={train_losses[3]:.4f}
+            Val: Mse={val_losses[1]:.4f} L1={val_losses[0]:.4f} Mape={val_losses[2]:.4f}
+            """
         )
 
         # Log metrics to wandb
         wandb.log(
             {
+                "train_mse": train_losses[2],
+                "train_l1": train_losses[1],
+                "train_mape": train_losses[3],
+                "val_mse": val_losses[1],
+                "val_l1": val_losses[0],
+                "val_mape": val_losses[2],
                 "epoch": epoch,
-                "train_loss": train_loss,
-                "val_score": cur_tvt_scores[0],
-                "best_val_score": best_tvt_scores[0],
+                "train_loss": train_losses[0],
             }
         )
 
-        # Update the best validation score
-        if cur_tvt_scores[1][0] < best_tvt_scores[1][0]:
-            best_tvt_scores = (cur_tvt_scores[0], cur_tvt_scores[1], cur_tvt_scores[2])
+    print(f"Best model: Epoch {best_epoch}, Loss: {best_loss:.4f}")
 
-    # Finish wandb runf
+    # Finish wandb run
     wandb.finish()
 
     # The objective value is the best validation score
-    return best_tvt_scores[1]
+    return best_loss
+
+    # # The objective value is the best validation score
+    # return best_tvt_scores[1]
+
+    # Initialize the model with the new hyperparameters
+    # model = HeteroGNN(
+    #     hetero_graph,
+    #     {
+    #         "hidden_size": config.hidden_size,
+    #         "attn_size": config.attn_size,
+    #         "device": train_args["device"],
+    #     },
+    #     num_layers=config.num_layers,
+    #     aggr=config.aggr,
+    # ).to(train_args["device"])
+    # optimizer = torch.optim.Adam(
+    #     model.parameters(), lr=config.lr, weight_decay=config.weight_decay
+    # )
+
+    # # Initialize best scores with infinity
+    # best_tvt_scores = (float("inf"), float("inf"), float("inf"))
+
+    # # Training loop
+    # for epoch in range(config.epochs):
+    #     train_loss = train(model, optimizer, hetero_graph, train_idx)
+    #     cur_tvt_scores, best_tvt_scores, _ = test(
+    #         model, hetero_graph, [train_idx, val_idx, test_idx], None, best_tvt_scores
+    #     )
+
+    #     print(
+    #         f"Epoch {epoch} Loss {train_loss:.4f} Current Train,Val,Test Scores {[score.item() for score in cur_tvt_scores]}"
+    #     )
+
+    #     # Log metrics to wandb
+    #     wandb.log(
+    #         {
+    #             "epoch": epoch,
+    #             "train_loss": train_loss,
+    #             "val_score": cur_tvt_scores[0],
+    #             "best_val_score": best_tvt_scores[0],
+    #         }
+    #     )
+
+    #     # Update the best validation score
+    #     if cur_tvt_scores[1][0] < best_tvt_scores[1][0]:
+    #         best_tvt_scores = (cur_tvt_scores[0], cur_tvt_scores[1], cur_tvt_scores[2])
+
+    # # Finish wandb runf
+    # wandb.finish()
+
+    # # The objective value is the best validation score
+    # return best_tvt_scores[1]
 
 
-def hyper_parameter_tuning(hetero_graph):
+def hyper_parameter_tuning(
+    train_batches,
+    val_batches,
+    test_batches,
+    train_batches_cpu,
+    val_batches_cpu,
+    test_batches_cpu,
+):
     study = optuna.create_study(direction="minimize")
 
-    train_idx, val_idx, test_idx = create_split(hetero_graph)
+    # train_idx, val_idx, test_idx = create_split(hetero_graph)
     study.optimize(
-        lambda trial: objective(trial, hetero_graph, train_idx, val_idx, test_idx),
-        n_trials=500,
+        lambda trial: objective(
+            trial,
+            train_batches,
+            val_batches,
+            test_batches,
+            train_batches_cpu,
+            val_batches_cpu,
+            test_batches_cpu,
+        ),
+        n_trials=5,
     )
 
     print("Best trial:")
@@ -298,7 +417,6 @@ def hyper_parameter_tuning(hetero_graph):
 
 
 def train_model(
-    hetero_graph,
     train_batches,
     val_batches,
     test_batches,
@@ -325,13 +443,11 @@ def train_model(
     best_loss = float("inf")
     for epoch in range(train_args["epochs"]):
         train_losses = np.zeros(4)
-
+        
         for train_batch, train_batch_cpu in zip(train_batches, train_batches_cpu):
             # if train_batch != train_batches[0] and epoch == 0 or True:
             train_batch_gpu = graph_tensors_to_device(train_batch, train_batch_cpu)
-            
-            
-            
+
             model.hetero_graph = train_batch_gpu
 
             loss_train = train(model, optimizer, train_batch_gpu)
@@ -373,6 +489,7 @@ def train_model(
             """
         )
     #
+    print(f"Best model: Epoch {epoch}, Loss: {best_loss:.4f}")
     # print(
     #     f"""Best model: {epoch} Loss: {loss:.4f}
     #     Train: Mse={best_tvt_scores[0][0].item():.4f} L1={best_tvt_scores[0][0].item():.4f} Mape={best_tvt_scores[0][2].item():.4f}
@@ -425,8 +542,9 @@ def get_batches_from_pickle(folder_path):
         print(file_path)
         with open(file_path, "rb") as f:
             G = pickle.load(f)
-        with open(file_path, "rb") as f:
-            G_cpu = pickle.load(f)
+        G_cpu = copy.deepcopy(G)
+        # with open(file_path, "rb") as f:
+        #     G_cpu = pickle.load(f)
         hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
         hetero_graph_cpu = HeteroGraph(G_cpu, netlib=nx, directed=True)
         # graph_tensors_to_device(hetero_graph)
@@ -434,30 +552,6 @@ def get_batches_from_pickle(folder_path):
         cpu_batches.append(hetero_graph_cpu)
 
     return batches, cpu_batches
-
-
-# def get_hetero_graph_dataset(folder_path):
-#     pickle_files = os.listdir(folder_path)
-
-#     subgraphs = []
-#     cpu_subgraphs = []
-
-#     for file_name in pickle_files:
-#         file_path = os.path.join(folder_path, file_name)
-#         print(file_path)
-#         with open(file_path, "rb") as f:
-#             G = pickle.load(f)
-
-#         for node in G.nodes():
-#             G.nodes[node]["node_label"] = 1
-
-#         hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
-#         subgraphs.append(hetero_graph)
-#         cpu_subgraphs.append(HeteroGraph(copy.deepcopy(G), netlib=nx, directed=True))
-
-#     dataset = GraphDataset(subgraphs, task="node")
-
-#     return dataset
 
 
 if __name__ == "__main__":
@@ -492,15 +586,21 @@ if __name__ == "__main__":
     # Create a HeteroGraph object from the networkx graph
 
     # hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
-    hetero_graph = None
+    # hetero_graph = None
     # Send all the necessary tensors to the same device
     # graph_tensors_to_device(hetero_graph)
 
     if args.mode == "tune":
-        hyper_parameter_tuning(hetero_graph)
+        hyper_parameter_tuning(
+            train_batches,
+            val_batches,
+            test_batches,
+            train_batches_cpu,
+            val_batches_cpu,
+            test_batches_cpu,
+        )
     if args.mode == "train":
         train_model(
-            hetero_graph,
             train_batches,
             val_batches,
             test_batches,
