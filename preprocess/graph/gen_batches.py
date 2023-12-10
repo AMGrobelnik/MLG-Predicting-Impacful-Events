@@ -8,7 +8,7 @@ import torch
 
 
 def load_data():
-    with open("../../data/batch/B_recent_10_merged_khops.pkl", "rb") as f:
+    with open("../../data/batch/B_recent_10_khops_2k.pkl", "rb") as f:
         subgraph_ids = pickle.load(f)
         for i in range(len(subgraph_ids)):
             subgraph_ids[i] = (subgraph_ids[i][0], list(subgraph_ids[i][1]))
@@ -52,10 +52,10 @@ def batch_generate(subgraph_ids, event_index, batch_size):
 
     # generate batches
     i = 0
-    for batch in batched_ids:
+    for batch in tqdm(batched_ids, desc="Generating batches"):
         graphs = []
 
-        for target_ids, neighbor_ids in tqdm(batch, desc="Generating batches"):
+        for target_ids, neighbor_ids in batch:
             graph = generate_subgraph(target_ids, neighbor_ids, event_index)
             graphs.append(graph)
 
@@ -107,6 +107,8 @@ def load_concept_llm_files():
 
 
 src_files = None
+
+
 def load_files(files_to_idx):
     global src_files
     """
@@ -120,7 +122,7 @@ def load_files(files_to_idx):
     for file_name in files_to_idx.keys():
         if file_name in src_files:
             continue
-        with open(f"../../data/preprocessed/{file_name}.pkl", "rb") as f:
+        with open(f"../../data/preprocessed_dicts/f{file_name}.pkl", "rb") as f:
             file = pickle.load(f)
             src_files[file_name] = file
 
@@ -138,12 +140,12 @@ def add_event(graph, event_id, e_type, all_nodes, src_file):
     :return:
     """
 
-    event = src_file.loc[event_id]
+    event = src_file[event_id]
     info = event["info"]
     event_counts = info["articleCounts"]["total"]
     event_date = info["eventDate"]
     concepts = info["concepts"]
-    similar = event["similarEvents"]
+    similar = event["similar_events"]
 
     features = np.array([event_date])
     target = None
@@ -202,11 +204,21 @@ def generate_subgraph(target_ids, neighbor_ids, event_index):
             event_type = "event_target" if eid in target_ids else "event"
             add_event(graph, eid, event_type, all_nodes, src_file)
 
+    # add degree to concepts
+    for node in graph.nodes():
+        if graph.nodes[node]["node_type"] == "concept":
+            graph.nodes[node]["node_feature"] = torch.tensor(
+                [graph.degree[node] - 1], dtype=torch.float32
+            )
+
     return graph
 
 
 def main():
     subgraph_ids, event_index = load_data()
+
+    subgraph_ids = subgraph_ids[1500:2000]
+
     batch_generate(subgraph_ids, event_index, 10)
 
 
