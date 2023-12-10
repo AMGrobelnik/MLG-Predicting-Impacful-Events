@@ -1,22 +1,20 @@
-# Attention vs mean
+# GAT vs. SAGE (full 768d embeddings)
 
 * Attention aggregation
 ```
-Best model: Loss: 861.3662
-        Train: Mse=1918.9591 L1=16.4033 Mape=1.7814
-        Val: Mse=3435.9109 L1=19.2096 Mape=1.4332
-        Test: Mse=2574.9324 L1=18.6548 Mape=2.1725
+Best model: Loss: 2467.6296
+        Train: Mse=3774.5608 L1=18.5433 Mape=0.8842
+        Val: Mse=3424.4846 L1=17.7640 Mape=0.8266
+        Test: Mse=2320.0542 L1=18.8420 Mape=0.9459
 ```
 
-* Mean aggregation
+* Graph SAGE aggregation
 ```
-Best model: Loss: 866.6550
-        Train: Mse=1297.0402 L1=15.8553 Mape=2.1961
-        Val: Mse=3656.9717 L1=20.7883 Mape=1.4172
-        Test: Mse=2965.6980 L1=19.3168 Mape=1.9360
+Best model: Loss: 2313.7004
+        Train: Mse=4021.7510 L1=20.0032 Mape=0.8206
+        Val: Mse=3695.0471 L1=18.9166 Mape=0.6977
+        Test: Mse=2551.1804 L1=20.0978 Mape=0.8410
 ```
-
-
 
 ## UMAP 100 dim
 
@@ -34,6 +32,14 @@ train_args = {
 }
 ```
 
+* UMAP dimensions: 0
+```
+Best model: Loss: 3211.1528
+        Train: Mse=3800.7212 L1=18.4903 Mape=0.8052
+        Val: Mse=3449.5144 L1=17.7830 Mape=0.7559
+        Test: Mse=2346.9702 L1=18.6943 Mape=0.8421
+Time elapsed 363.1913011074066
+```
 
 * UMAP dimensions: 10
 ```
