@@ -275,7 +275,7 @@ def remove_future_edges(graph: nx.Graph, threshold: int):
             # remove the edge if
             # - it points to the past
             # - they happen at the same time (i.e. within the threshold)
-            if d1 < d2 or abs(d1 - d2) <= threshold:
+            if d1 > d2 or abs(d1 - d2) <= threshold:
                 to_remove.append((u, v))
 
     graph.remove_edges_from(to_remove)
