@@ -321,12 +321,12 @@ def train_model(hetero_graph):
             Val: Mse={cur_tvt_scores[1][0].item():.4f} L1={cur_tvt_scores[1][1].item():.4f} Mape={cur_tvt_scores[1][2].item():.4f}
             Test: Mse={cur_tvt_scores[2][0].item():.4f} L1={cur_tvt_scores[2][1].item():.4f} Mape={cur_tvt_scores[2][2].item():.4f}"""
         )
-
+    
     print(
-        f"""Best model: {epoch} Loss: {loss:.4f}
-        Train: Mse={cur_tvt_scores[0][0].item():.4f} L1={cur_tvt_scores[0][1].item():.4f} Mape={cur_tvt_scores[0][2].item():.4f}
-        Val: Mse={cur_tvt_scores[1][0].item():.4f} L1={cur_tvt_scores[1][1].item():.4f} Mape={cur_tvt_scores[1][2].item():.4f}
-        Test: Mse={cur_tvt_scores[2][0].item():.4f} L1={cur_tvt_scores[2][1].item():.4f} Mape={cur_tvt_scores[2][2].item():.4f}"""
+        f"""Best model: Loss: {loss:.4f}
+        Train: Mse={best_tvt_scores[0][0].item():.4f} L1={best_tvt_scores[0][1].item():.4f} Mape={best_tvt_scores[0][2].item():.4f}
+        Val: Mse={best_tvt_scores[1][0].item():.4f} L1={best_tvt_scores[1][1].item():.4f} Mape={best_tvt_scores[1][2].item():.4f}
+        Test: Mse={best_tvt_scores[2][0].item():.4f} L1={best_tvt_scores[2][1].item():.4f} Mape={best_tvt_scores[2][2].item():.4f}"""
     )
 
     model = HeteroGNN(
@@ -370,7 +370,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load the heterogeneous graph data
-    with open("./1_concepts_similar_llm_noFutureThr2_noIsolates.pkl", "rb") as f:
+    with open("./1_concepts_similar_noFutureThr2_noIsolates.pkl", "rb") as f:
         G = pickle.load(f)
         
     # for n in G.nodes(data=True):
@@ -384,7 +384,6 @@ if __name__ == "__main__":
 
     # Send all the necessary tensors to the same device
     graph_tensors_to_device(hetero_graph)
-    args.mode = 'train'
     if args.mode == "tune":
         hyper_parameter_tuning(hetero_graph)
     if args.mode == "train":

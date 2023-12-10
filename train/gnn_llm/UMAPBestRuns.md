@@ -15,6 +15,22 @@ train_args = {
 ```
 
 
+* UMAP dimensions: 10
+```
+Best model: 232 Loss: 74.6760
+        Train: Mse=1207.9514 L1=13.5545 Mape=1.0253
+        Val: Mse=7706.1157 L1=24.5581 Mape=1.0595
+        Test: Mse=5270.7939 L1=20.0636 Mape=1.6485
+```
+
+* UMAP dimensions: 25
+```
+Best model: 232 Loss: 97.3956
+        Train: Mse=212.2192 L1=9.3450 Mape=1.9516
+        Val: Mse=6223.7837 L1=25.7239 Mape=2.0327
+        Test: Mse=3474.9949 L1=18.8172 Mape=2.2061
+```
+
 * UMAP dimensions: 50
 ```
 Best model: 232 Loss: 74.6760
