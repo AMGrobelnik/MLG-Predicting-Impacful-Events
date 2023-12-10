@@ -363,7 +363,7 @@ def get_referenced_ids(n_files: int):
     return e_ids, c_ids
 
 
-n = 4
+n = 1
 concepts = True
 similar = True
 llm_embeddings = True
@@ -371,12 +371,12 @@ llm_embeddings = True
 remove_isolates = True
 remove_future = True
 future_threshold = 2
-no_unknown = False
+no_unknown = True
 count_feature = False  # include article counts in the node features
 
-embedded_directory = "embedded_umap"
-concept_embeds_filename = "concept_embeds_umap"
-embedding_dim = 50
+embedded_directory = "embedded"
+concept_embeds_filename = "concept_embeds"
+embedding_dim = 768
 
 
 def main():
