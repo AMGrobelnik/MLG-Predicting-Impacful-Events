@@ -375,18 +375,16 @@ if __name__ == "__main__":
         import umap
         G = pickle.load(f)
 
-        # features = [data['node_feature'] for _, data in G.nodes(data=True)]
-        # features_array = np.array(features)
+        features = [data['node_feature'] for _, data in G.nodes(data=True)]
+        features_array = np.array(features)
 
-        # # Step 3: Apply UMAP for dimensionality reduction
-        # reducer = umap.UMAP(n_components=2)  # You can change n_components to your desired dimensionality
-        # reduced_features = reducer.fit_transform(features_array)
+        # Step 3: Apply UMAP for dimensionality reduction
+        reducer = umap.UMAP(n_components=2)  # You can change n_components to your desired dimensionality
+        reduced_features = reducer.fit_transform(features_array)
 
-        print("Initial feature", [G.nodes[node]['node_feature'] for node, _ in list(G.nodes(data=True))[:1]])
-        print("Initial shape", [G.nodes[node]['node_feature'].shape for node, _ in list(G.nodes(data=True))[:1]])
-
-        for node, _ in G.nodes(data=True):
-            G.nodes[node]['node_feature'] = torch.tensor([G.nodes[node]['node_feature'][0]])
+        # Step 4: Update the graph
+        for (node, _), reduced_feature in zip(G.nodes(data=True), reduced_features):
+            G.nodes[node]['node_feature'] = reduced_feature
         
     # for n in G.nodes(data=True):
     #     if n[1]['node_feature'].shape[0] != 101:
