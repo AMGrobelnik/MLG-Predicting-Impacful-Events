@@ -35,7 +35,6 @@ def event_date_to_timestamp(event: dict, similar_event: bool):
         return round(date_obj.timestamp() / 3600 / 24)
 
 
-
 def load_json_file(file_path):
     try:
         with open(file_path, "r") as file:
