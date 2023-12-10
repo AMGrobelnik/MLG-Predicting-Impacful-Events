@@ -225,7 +225,9 @@ def add_concept_features(graph: nx.Graph, llm_embeddings: bool):
 
         # add features to the graph, one embedding file at a time
         for file in tqdm(file_to_ids.keys(), desc="Iterating concept files", ncols=100):
-            embeds = pickle.load(open(f"../../data/text/{concept_embeds_filename}/{file}", "rb"))
+            embeds = pickle.load(
+                open(f"../../data/text/{concept_embeds_filename}/{file}", "rb")
+            )
             for node in file_to_ids[file]:
                 degree = graph.degree(node)
                 llm = torch.tensor(embeds.loc[node]["label"], dtype=torch.float32)
@@ -273,7 +275,7 @@ def remove_future_edges(graph: nx.Graph, threshold: int):
             # remove the edge if
             # - it points to the past
             # - they happen at the same time (i.e. within the threshold)
-            if d1 < d2 or abs(d1 - d2) <= threshold:
+            if d1 > d2 or abs(d1 - d2) <= threshold:
                 to_remove.append((u, v))
 
     graph.remove_edges_from(to_remove)
@@ -361,7 +363,7 @@ def get_referenced_ids(n_files: int):
     return e_ids, c_ids
 
 
-n = 1
+n = 4
 concepts = True
 similar = True
 llm_embeddings = True
@@ -376,7 +378,8 @@ embedded_directory = "embedded_umap"
 concept_embeds_filename = "concept_embeds_umap"
 embedding_dim = 50
 
-if __name__ == "__main__":
+
+def main():
     start_time = pd.Timestamp.now()
     graph = generate_graph(n, concepts, similar, llm_embeddings, no_unknown)
 
@@ -407,3 +410,7 @@ if __name__ == "__main__":
     end_time = pd.Timestamp.now()
     print(f"Time taken: {round((end_time - start_time).seconds / 60, 2)} min")
     print_graph_statistics(graph)
+
+
+if __name__ == "__main__":
+    main()
