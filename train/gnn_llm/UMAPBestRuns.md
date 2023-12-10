@@ -1,3 +1,23 @@
+# Attention vs mean
+
+* Attention aggregation
+```
+Best model: Loss: 861.3662
+        Train: Mse=1918.9591 L1=16.4033 Mape=1.7814
+        Val: Mse=3435.9109 L1=19.2096 Mape=1.4332
+        Test: Mse=2574.9324 L1=18.6548 Mape=2.1725
+```
+
+* Mean aggregation
+```
+Best model: Loss: 866.6550
+        Train: Mse=1297.0402 L1=15.8553 Mape=2.1961
+        Val: Mse=3656.9717 L1=20.7883 Mape=1.4172
+        Test: Mse=2965.6980 L1=19.3168 Mape=1.9360
+```
+
+
+
 ## UMAP 100 dim
 
 Hyperparams:
