@@ -605,11 +605,12 @@ def get_batches_from_pickle(folder_path):
         print(file_path)
         with open(file_path, "rb") as f:
             G = pickle.load(f)
-        G_cpu = copy.deepcopy(G)
+        # G_cpu = copy.deepcopy(G)
         # with open(file_path, "rb") as f:
         #     G_cpu = pickle.load(f)
+
         hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
-        hetero_graph_cpu = HeteroGraph(G_cpu, netlib=nx, directed=True)
+        hetero_graph_cpu = HeteroGraph(G, netlib=nx, directed=True)
         # graph_tensors_to_device(hetero_graph)
         batches.append(hetero_graph)
         cpu_batches.append(hetero_graph_cpu)
