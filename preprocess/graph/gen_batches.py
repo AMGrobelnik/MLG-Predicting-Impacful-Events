@@ -138,7 +138,7 @@ def load_files(files_to_idx):
     return src_files, llm_files
 
 
-def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file):
+def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file, target_ids):
     """
     Adds an event to the graph
     :param graph:
@@ -193,7 +193,7 @@ def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file):
             e_from, e_to = e_to, e_from
 
         # no edges of type (event_target, similar, event)
-        if e_from == event_id and e_type == "event_target":
+        if e_from in target_ids:
             continue
 
         graph.add_edge(e_from, e_to, edge_type="similar")
@@ -228,7 +228,7 @@ def generate_subgraph(target_ids, neighbor_ids, event_index):
 
         for eid in ids:
             event_type = "event_target" if eid in target_ids else "event"
-            add_event(graph, eid, event_type, all_nodes, src_file, llm_file)
+            add_event(graph, eid, event_type, all_nodes, src_file, llm_file, target_ids)
 
     # add features to concepts
     for node in graph.nodes():
