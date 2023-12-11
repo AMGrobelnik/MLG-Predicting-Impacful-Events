@@ -100,11 +100,11 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
         """
 
         message_type_emb = {}
-        for message_key, message_type in edge_indices.items():
+        for message_key, edge_index in edge_indices.items():
             src_type, edge_type, dst_type = message_key
             node_feature_src = node_features[src_type]
             node_feature_dst = node_features[dst_type]
-            edge_index = edge_indices[message_key]
+            # edge_index = edge_indices[message_key]
             message_type_emb[message_key] = self.convs[message_key](
                 node_feature_src,
                 node_feature_dst,
@@ -190,7 +190,15 @@ def generate_convs(hetero_graph, conv, hidden_size, first_layer=False):
 
 
 class HeteroGNN(torch.nn.Module):
-    def __init__(self, hetero_graph, args, num_layers, aggr="mean", return_embedding=False, mask_unknown=True):
+    def __init__(
+        self,
+        hetero_graph,
+        args,
+        num_layers,
+        aggr="mean",
+        return_embedding=False,
+        mask_unknown=True,
+    ):
         """
         Initializes the HeteroGNN instance.
         :param hetero_graph: The heterogeneous graph for which convolutions are to be created.
@@ -218,9 +226,12 @@ class HeteroGNN(torch.nn.Module):
         for i in range(self.num_layers):
             first_layer = i == 0
             conv = HeteroGNNWrapperConv(
-                    generate_convs(hetero_graph, HeteroGNNConv, self.hidden_size, first_layer),
-                    args,
-                    self.aggr)
+                generate_convs(
+                    hetero_graph, HeteroGNNConv, self.hidden_size, first_layer
+                ),
+                args,
+                self.aggr,
+            )
             self.convs.append(conv)
 
         # Initialize batch normalization and ReLU layers for each layer and node type
@@ -293,6 +304,6 @@ class HeteroGNN(torch.nn.Module):
         else:
             # TODO: check if this is correct
             idx = indices["event"]
-            loss += loss_func(preds["event"][id , y["event"][idx]])
+            loss += loss_func(preds["event"][id, y["event"][idx]])
 
         return loss

@@ -147,20 +147,21 @@ def add_event(graph, event_id, e_type, all_nodes, src_file):
     concepts = info["concepts"]
     similar = event["similar_events"]
 
-    features = np.array([event_date])
+    features = np.array([event_date], dtype=np.float32)
     target = None
 
     if e_type == "event":
-        features = np.concatenate([np.array([event_counts]), features])
+        features = np.concatenate([np.array([event_counts]), features], dtype=np.float32)
     else:
         target = torch.tensor([event_counts], dtype=torch.float32)
 
     features = torch.from_numpy(features)
 
     # add node
-    graph.add_node(
-        event_id, node_type=e_type, node_feature=features, node_target=target
-    )
+    if e_type == "event":
+        graph.add_node(event_id, node_type=e_type, node_feature=features)
+    else:
+        graph.add_node(event_id, node_type=e_type, node_feature=features, node_target=target)
 
     # add similar event edges
     for se in similar:
