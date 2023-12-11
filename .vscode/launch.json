@@ -79,5 +79,14 @@
             "justMyCode": true,
             "cwd": "C:\\Users\\Adrian\\Desktop\\MLG-Predicting-Impacful-Events\\train\\gnn_llm"
         },
+        {
+            "name": "Batch Split Surface",
+            "type": "python",
+            "request": "launch",
+            "program": "batch_split.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "C:\\Users\\Adrian\\Desktop\\MLG-Predicting-Impacful-Events\\preprocess\\graph\\"
+        },
     ]
 }

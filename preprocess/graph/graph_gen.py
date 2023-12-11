@@ -46,7 +46,7 @@ def get_event_attributes(
         else:
             if not is_similar:
                 tqdm.write(f"WARNING: LLM not found for {uri}")
-            feature_tensor = torch.cat((feature_tensor, torch.zeros(768 * 1)))
+            feature_tensor = torch.cat((feature_tensor, torch.zeros(embedding_dim * 1)))
 
     if count_feature:
         feature_tensor = torch.cat(
@@ -99,7 +99,7 @@ def get_similar_events(
 
 def load_llm_embeddings(file: str):
     file_name = file.split("/")[-1]
-    df = pd.read_pickle(f"../../data/text/embedded/{file_name}")
+    df = pd.read_pickle(f"../../data/text/{embedded_directory}/{file_name}")
     return df
 
 
@@ -225,7 +225,9 @@ def add_concept_features(graph: nx.Graph, llm_embeddings: bool):
 
         # add features to the graph, one embedding file at a time
         for file in tqdm(file_to_ids.keys(), desc="Iterating concept files", ncols=100):
-            embeds = pickle.load(open(f"../../data/text/concept_embeds/{file}", "rb"))
+            embeds = pickle.load(
+                open(f"../../data/text/{concept_embeds_filename}/{file}", "rb")
+            )
             for node in file_to_ids[file]:
                 degree = graph.degree(node)
                 llm = torch.tensor(embeds.loc[node]["label"], dtype=torch.float32)
@@ -273,7 +275,7 @@ def remove_future_edges(graph: nx.Graph, threshold: int):
             # remove the edge if
             # - it points to the past
             # - they happen at the same time (i.e. within the threshold)
-            if d1 < d2 or abs(d1 - d2) <= threshold:
+            if d1 > d2 or abs(d1 - d2) <= threshold:
                 to_remove.append((u, v))
 
     graph.remove_edges_from(to_remove)
@@ -361,10 +363,10 @@ def get_referenced_ids(n_files: int):
     return e_ids, c_ids
 
 
-n = 2
+n = 1
 concepts = True
 similar = True
-llm_embeddings = False
+llm_embeddings = True
 
 remove_isolates = True
 remove_future = True
@@ -372,7 +374,12 @@ future_threshold = 2
 no_unknown = False
 count_feature = False  # include article counts in the node features
 
-if __name__ == "__main__":
+embedded_directory = "embedded"
+concept_embeds_filename = "concept_embeds"
+embedding_dim = 768
+
+
+def main():
     start_time = pd.Timestamp.now()
     graph = generate_graph(n, concepts, similar, llm_embeddings, no_unknown)
 
@@ -403,3 +410,7 @@ if __name__ == "__main__":
     end_time = pd.Timestamp.now()
     print(f"Time taken: {round((end_time - start_time).seconds / 60, 2)} min")
     print_graph_statistics(graph)
+
+
+if __name__ == "__main__":
+    main()

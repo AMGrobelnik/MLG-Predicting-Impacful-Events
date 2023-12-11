@@ -1,11 +1,6 @@
 import copy
-import os
 import torch
 import deepsnap
-import deepsnap.batch
-from deepsnap.dataset import GraphDataset
-from deepsnap.batch import Batch
-from torch.utils.data import DataLoader
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
@@ -29,10 +24,10 @@ train_args = {
     # "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     "device": "cuda",
     "hidden_size": 81,
-    "epochs": 10,
+    "epochs": 233,
     "weight_decay": 0.00002203762357664057,
     "lr": 0.003873757421883433,
-    "attn_size": 48,
+    "attn_size": 32,
     "num_layers": 6,
     "aggr": "attn",
 }
@@ -481,6 +476,7 @@ def train_model(
         num_layers=train_args["num_layers"],
         aggr=train_args["aggr"],
         return_embedding=False,
+        mask_unknown=True
     ).to(train_args["device"])
 
     optimizer = torch.optim.Adam(
@@ -650,12 +646,14 @@ if __name__ == "__main__":
     # G = pickle.load(f)
 
     # Create a HeteroGraph object from the networkx graph
+    hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
+
+    print("DIM: ", hetero_graph.node_feature['event'][0].shape)
 
     # hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
     # hetero_graph = None
     # Send all the necessary tensors to the same device
-    # graph_tensors_to_device(hetero_graph)
-
+    graph_tensors_to_device(hetero_graph)
     if args.mode == "tune":
         hyper_parameter_tuning(
             train_batches,

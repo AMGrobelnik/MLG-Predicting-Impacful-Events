@@ -1,8 +1,10 @@
 source/*
 preprocessed/*
+preprocessed_dicts/*
 graphs/*
 text/*
 postprocess/*
+batch/*
 
 # Don't ignore .gitkeep files
 !.gitkeep
