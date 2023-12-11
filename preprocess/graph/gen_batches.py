@@ -4,7 +4,6 @@ import os
 import networkx as nx
 from tqdm import tqdm
 from glob import glob
-import torch
 
 
 def load_data():
@@ -97,12 +96,12 @@ def load_concept_llm_files():
     global concept_llms, concept_ids, concept_llm_folder
     files = glob(f"../../data/text/{concept_llm_folder}/concept_embeds_*.pkl")
     for file in files:
-        file_name = file.split("/")[-1].split('\\')[-1]
+        file_name = file.split("/")[-1].split("\\")[-1]
         with open(file, "rb") as f:
             llm_file = pickle.load(f)
             concept_llms[file_name] = llm_file
 
-    with open('../../data/text/concept_embeds/c_ids.pkl', 'rb') as f:
+    with open("../../data/text/concept_embeds/c_ids.pkl", "rb") as f:
         concept_ids = pickle.load(f)
 
 
@@ -110,7 +109,7 @@ def get_concept_llm(concept_id):
     global concept_llms, concept_ids
     for file, ids in concept_ids.items():
         if concept_id in ids:
-            return concept_llms[file].loc[concept_id]['label']
+            return concept_llms[file].loc[concept_id]["label"]
     return None
 
 
@@ -161,25 +160,26 @@ def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file):
     target = None
 
     if e_type == "event":
-        features = np.concatenate([np.array([event_counts]), features], dtype=np.float32)
+        features = np.concatenate(
+            [np.array([event_counts]), features], dtype=np.float32
+        )
     else:
-        target = torch.tensor([event_counts], dtype=torch.float32)
-
-    features = torch.from_numpy(features)
+        target = np.array([event_counts], dtype=np.float32)
 
     # add llm embeddings
     if llm_file is not None:
         llm = llm_file.loc[event_id]
-        title = torch.from_numpy(llm['title'])
-        summary = torch.from_numpy(llm['summary'])
-        features = torch.cat([features, title, summary], dim=0)
+        title = llm["title"]
+        summary = llm["summary"]
+        features = np.concatenate([features, title, summary], axis=0)
 
     # add node
     if e_type == "event":
         graph.add_node(event_id, node_type=e_type, node_feature=features)
     else:
-        graph.add_node(event_id, node_type=e_type, node_feature=features, node_target=target)
-
+        graph.add_node(
+            event_id, node_type=e_type, node_feature=features, node_target=target
+        )
 
     # add similar event edges
     for se in similar:
@@ -233,15 +233,15 @@ def generate_subgraph(target_ids, neighbor_ids, event_index):
     # add features to concepts
     for node in graph.nodes():
         if graph.nodes[node]["node_type"] == "concept":
-            deg = graph.degree[node] - 1 # subtract self-loop
-            deg = torch.tensor([deg], dtype=torch.float32)
+            deg = graph.degree[node] - 1  # subtract self-loop
+            deg = np.array([deg], dtype=np.float32)
 
             if not use_llm:
                 graph.nodes[node]["node_feature"] = deg
                 continue
 
-            llm = torch.from_numpy(get_concept_llm(node))
-            graph.nodes[node]["node_feature"] = torch.cat([deg, llm], dim=0)
+            llm = get_concept_llm(node)
+            graph.nodes[node]["node_feature"] = np.concatenate([deg, llm], axis=0)
 
     return graph
 
@@ -251,15 +251,16 @@ def main():
     if use_llm:
         load_concept_llm_files()
 
-    # subgraph_ids = subgraph_ids[:2]
+    subgraph_ids = subgraph_ids[:1]
     batch_generate(subgraph_ids, event_index, 1)
 
 
 src_files, llm_files, concept_llms, concept_ids = {}, {}, {}, {}
-concept_llm_folder = 'concept_embeds_umap_dim10'
-llm_folder = 'embedded_umap_dim10'
-batch_folder = 'batches_llm_10'
+concept_llm_folder = "concept_embeds_umap_dim10"
+llm_folder = "embedded_umap_dim10"
 use_llm = True
+
+batch_folder = "batches_llm_10"
 
 if __name__ == "__main__":
     # if batch_folder does not exist, create it
