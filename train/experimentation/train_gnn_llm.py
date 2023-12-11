@@ -22,12 +22,12 @@ from hetero_gnn import HeteroGNN
 train_args = {
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     "hidden_size": 81,
-    "epochs": 233,
+    "epochs": 80,
     "weight_decay": 0.00002203762357664057,
     "lr": 0.003873757421883433,
     "attn_size": 32,
     "num_layers": 6,
-    "aggr": "attn",
+    "aggr": "mean",
 }
 
 
@@ -348,13 +348,14 @@ def train_model(hetero_graph):
 
 
 def display_predictions(preds, hetero_graph, test_idx):
-    for i in range(test_idx["event"].shape[0]):
-        if hetero_graph.node_target["event"][test_idx["event"]][i] != -1:
-            print(
-                i,
-                preds["event"][test_idx["event"]][i],
-                hetero_graph.node_target["event"][test_idx["event"]][i],
-            )
+    # for i in range(test_idx["event"].shape[0]):
+    #     if hetero_graph.node_target["event"][test_idx["event"]][i] != -1:
+    #         print(
+    #             i,
+    #             preds["event"][test_idx["event"]][i],
+    #             hetero_graph.node_target["event"][test_idx["event"]][i],
+    #         )
+    pass
 
 
 if __name__ == "__main__":
@@ -370,8 +371,20 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load the heterogeneous graph data
-    with open("./1_concepts_similar_noFutureThr2_noIsolates.pkl", "rb") as f:
+    with open("./1_concepts_similar_llm_noUnknown_noFutureThr2_noIsolates.pkl", "rb") as f:
+        import umap
         G = pickle.load(f)
+
+        features = [data['node_feature'] for _, data in G.nodes(data=True)]
+        features_array = np.array(features)
+
+        # Step 3: Apply UMAP for dimensionality reduction
+        reducer = umap.UMAP(n_components=2)  # You can change n_components to your desired dimensionality
+        reduced_features = reducer.fit_transform(features_array)
+
+        # Step 4: Update the graph
+        for (node, _), reduced_feature in zip(G.nodes(data=True), reduced_features):
+            G.nodes[node]['node_feature'] = reduced_feature
         
     # for n in G.nodes(data=True):
     #     if n[1]['node_feature'].shape[0] != 101:
@@ -387,4 +400,8 @@ if __name__ == "__main__":
     if args.mode == "tune":
         hyper_parameter_tuning(hetero_graph)
     if args.mode == "train":
+        import time
+        start = time.time()
         train_model(hetero_graph)
+        end = time.time()
+        print("Time elapsed", end - start)

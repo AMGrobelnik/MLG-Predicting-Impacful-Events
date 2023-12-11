@@ -1,5 +1,6 @@
 source/*
 preprocessed/*
+preprocessed_dicts/*
 graphs/*
 text/*
 postprocess/*
