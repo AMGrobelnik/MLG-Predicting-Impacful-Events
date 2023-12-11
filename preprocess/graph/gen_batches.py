@@ -174,6 +174,10 @@ def add_event(graph, event_id, e_type, all_nodes, src_file):
         if se_date < event_date:
             e_from, e_to = e_to, e_from
 
+        # no edges of type (event_target, similar, event)
+        if e_from == event_id and e_type == "event_target":
+            continue
+
         graph.add_edge(e_from, e_to, edge_type="similar")
 
     # add concepts
@@ -218,7 +222,7 @@ def generate_subgraph(target_ids, neighbor_ids, event_index):
 def main():
     subgraph_ids, event_index = load_data()
 
-    subgraph_ids = subgraph_ids[1500:2000]
+    subgraph_ids = subgraph_ids[0]
 
     batch_generate(subgraph_ids, event_index, 10)
 
