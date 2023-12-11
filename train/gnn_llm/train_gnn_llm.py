@@ -20,12 +20,13 @@ from multiprocessing.pool import ThreadPool
 
 from hetero_gnn import HeteroGNN
 import os
+from tqdm import tqdm
 
 train_args = {
     # "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     "device": "cuda",
     "hidden_size": 81,
-    "epochs": 233,
+    "epochs": 10,
     "weight_decay": 0.00002203762357664057,
     "lr": 0.003873757421883433,
     "attn_size": 32,
@@ -259,7 +260,9 @@ def objective(
     for epoch in range(config["epochs"]):
         train_losses = np.zeros(4)
 
-        for train_batch, train_batch_cpu in zip(train_batches, train_batches_cpu):
+        for train_batch, train_batch_cpu in tqdm(
+            zip(train_batches, train_batches_cpu), total=len(train_batches)
+        ):
             # if train_batch != train_batches[0] and epoch == 0 or True:
             train_batch_gpu = graph_tensors_to_device(train_batch, train_batch_cpu)
 
@@ -278,7 +281,9 @@ def objective(
 
         val_losses = np.zeros(3)
 
-        for val_batch, val_batch_cpu in zip(val_batches, val_batches_cpu):
+        for val_batch, val_batch_cpu in tqdm(
+            zip(val_batches, val_batches_cpu), total=len(val_batches)
+        ):
             # if epoch == 0 or True:
             val_batch_gpu = graph_tensors_to_device(val_batch, val_batch_cpu)
 
@@ -334,7 +339,9 @@ def objective(
 
     test_losses = np.zeros(3)
 
-    for test_batch, test_batch_cpu in zip(test_batches, test_batches_cpu):
+    for test_batch, test_batch_cpu in tqdm(
+        zip(test_batches, test_batches_cpu), total=len(test_batches)
+    ):
         # if epoch == 0 or True:
         test_batch_gpu = graph_tensors_to_device(test_batch, test_batch_cpu)
 
@@ -489,7 +496,9 @@ def train_model(
     for epoch in range(train_args["epochs"]):
         train_losses = np.zeros(4)
 
-        for train_batch, train_batch_cpu in zip(train_batches, train_batches_cpu):
+        for train_batch, train_batch_cpu in tqdm(
+            zip(train_batches, train_batches_cpu), total=len(train_batches)
+        ):
             # if train_batch != train_batches[0] and epoch == 0 or True:
             train_batch_gpu = graph_tensors_to_device(train_batch, train_batch_cpu)
 
@@ -508,7 +517,9 @@ def train_model(
 
         val_losses = np.zeros(3)
 
-        for val_batch, val_batch_cpu in zip(val_batches, val_batches_cpu):
+        for val_batch, val_batch_cpu in tqdm(
+            zip(val_batches, val_batches_cpu), total=len(val_batches)
+        ):
             # if epoch == 0 or True:
             val_batch_gpu = graph_tensors_to_device(val_batch, val_batch_cpu)
 
@@ -550,7 +561,9 @@ def train_model(
 
     test_losses = np.zeros(3)
 
-    for test_batch, test_batch_cpu in zip(test_batches, test_batches_cpu):
+    for test_batch, test_batch_cpu in tqdm(
+        zip(test_batches, test_batches_cpu), total=len(test_batches)
+    ):
         # if epoch == 0 or True:
         test_batch_gpu = graph_tensors_to_device(test_batch, test_batch_cpu)
 
@@ -608,15 +621,17 @@ def get_batches_from_pickle(folder_path):
         # G_cpu = copy.deepcopy(G)
         # with open(file_path, "rb") as f:
         #     G_cpu = pickle.load(f)
-        
+
         # print(type(G))
-        
+
         hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
         hetero_graph_cpu = HeteroGraph(G, netlib=nx, directed=True)
-        
-        hetero_graph['node_target'] = hetero_graph._get_node_attributes('node_target')
-        hetero_graph_cpu['node_target'] = hetero_graph_cpu._get_node_attributes('node_target')
-        
+
+        hetero_graph["node_target"] = hetero_graph._get_node_attributes("node_target")
+        hetero_graph_cpu["node_target"] = hetero_graph_cpu._get_node_attributes(
+            "node_target"
+        )
+
         # graph_tensors_to_device(hetero_graph)
         batches.append(hetero_graph)
         cpu_batches.append(hetero_graph_cpu)
