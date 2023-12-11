@@ -1,6 +1,6 @@
 import pickle
 import numpy as np
-import pandas as pd
+import os
 import networkx as nx
 from tqdm import tqdm
 from glob import glob
@@ -9,7 +9,7 @@ from deepsnap.hetero_graph import HeteroGraph
 
 
 def load_data():
-    with open("../../data/batch/B_recent_10_khops_2k.pkl", "rb") as f:
+    with open("../../data/batch/B_recent_10_khops_12k.pkl", "rb") as f:
         subgraph_ids = pickle.load(f)
         for i in range(len(subgraph_ids)):
             subgraph_ids[i] = (subgraph_ids[i][0], list(subgraph_ids[i][1]))
@@ -30,9 +30,11 @@ def reverse_event_index(event_index):
 
 
 def save_batch(graphs, start_index):
+    global batch_folder
+
     for i, graph in enumerate(graphs):
         file_name = f"batch_{str(start_index + i).zfill(5)}.pkl"
-        with open("../../data/graphs/batches/" + file_name, "wb") as f:
+        with open(f"../../data/graphs/{batch_folder}/" + file_name, "wb") as f:
             pickle.dump(graph, f)
 
 
@@ -98,32 +100,33 @@ def get_files_to_idx(t_ids, n_ids, event_index):
 
 
 def load_concept_llm_files():
-    files = glob("../../data/text/concept_embeds/concept_embeds_*.pkl")
-    llm_files = {}
+    global concept_llms, concept_ids, concept_llm_folder
+    files = glob(f"../../data/text/{concept_llm_folder}/concept_embeds_*.pkl")
     for file in files:
+        file_name = file.split("/")[-1].split('\\')[-1]
         with open(file, "rb") as f:
             llm_file = pickle.load(f)
-            llm_files[file] = llm_file
+            concept_llms[file_name] = llm_file
 
-    # with open(f"../../data/text/embedded/{file_name}.pkl", "rb") as f:
-    #     file = pickle.load(f)
-    #     llm_files[file_name] = file
-
-    return llm_files
+    with open('../../data/text/concept_embeds/c_ids.pkl', 'rb') as f:
+        concept_ids = pickle.load(f)
 
 
-src_files = None
+def get_concept_llm(concept_id):
+    global concept_llms, concept_ids
+    for file, ids in concept_ids.items():
+        if concept_id in ids:
+            return concept_llms[file].loc[concept_id]['label']
+    return None
 
 
 def load_files(files_to_idx):
-    global src_files
+    global src_files, llm_files, use_llm, llm_folder
     """
     Loads files into memory
     :param files_to_idx: maps file names -> event ids
     :return:
     """
-    if src_files is None:
-        src_files = {}
 
     for file_name in files_to_idx.keys():
         if file_name in src_files:
@@ -132,10 +135,17 @@ def load_files(files_to_idx):
             file = pickle.load(f)
             src_files[file_name] = file
 
-    return src_files
+        if not use_llm:
+            continue
+
+        with open(f"../../data/text/{llm_folder}/{file_name}.pkl", "rb") as f:
+            file = pickle.load(f)
+            llm_files[file_name] = file
+
+    return src_files, llm_files
 
 
-def add_event(graph, event_id, e_type, all_nodes, src_file):
+def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file):
     """
     Adds an event to the graph
     :param graph:
@@ -163,11 +173,19 @@ def add_event(graph, event_id, e_type, all_nodes, src_file):
 
     features = torch.from_numpy(features)
 
+    # add llm embeddings
+    if llm_file is not None:
+        llm = llm_file.loc[event_id]
+        title = torch.from_numpy(llm['title'])
+        summary = torch.from_numpy(llm['summary'])
+        features = torch.cat([features, title, summary], dim=0)
+
     # add node
     if e_type == "event":
         graph.add_node(event_id, node_type=e_type, node_feature=features)
     else:
         graph.add_node(event_id, node_type=e_type, node_feature=features, node_target=target)
+
 
     # add similar event edges
     for se in similar:
@@ -203,35 +221,55 @@ def generate_subgraph(target_ids, neighbor_ids, event_index):
     :param event_index: maps event ids -> file names
     :return:
     """
+    global src_files, llm_files, concept_llms, use_llm
+
     # get files to idx
     files_to_idx, all_nodes = get_files_to_idx(target_ids, neighbor_ids, event_index)
-    src_files = load_files(files_to_idx)
+    load_files(files_to_idx)
 
     graph = nx.DiGraph()
     for file_name, ids in files_to_idx.items():
         src_file = src_files[file_name]
+        llm_file = llm_files[file_name] if use_llm else None
 
         for eid in ids:
             event_type = "event_target" if eid in target_ids else "event"
-            add_event(graph, eid, event_type, all_nodes, src_file)
+            add_event(graph, eid, event_type, all_nodes, src_file, llm_file)
 
-    # add degree to concepts
+    # add features to concepts
     for node in graph.nodes():
         if graph.nodes[node]["node_type"] == "concept":
-            graph.nodes[node]["node_feature"] = torch.tensor(
-                [graph.degree[node] - 1], dtype=torch.float32
-            )
+            deg = graph.degree[node] - 1 # subtract self-loop
+            deg = torch.tensor([deg], dtype=torch.float32)
+
+            if not use_llm:
+                graph.nodes[node]["node_feature"] = deg
+                continue
+
+            llm = torch.from_numpy(get_concept_llm(node))
+            graph.nodes[node]["node_feature"] = torch.cat([deg, llm], dim=0)
 
     return graph
 
 
 def main():
     subgraph_ids, event_index = load_data()
+    if use_llm:
+        load_concept_llm_files()
 
-    subgraph_ids = subgraph_ids[0]
+    # subgraph_ids = subgraph_ids[:2]
+    batch_generate(subgraph_ids, event_index, 1)
 
-    batch_generate(subgraph_ids, event_index, 10)
 
+src_files, llm_files, concept_llms, concept_ids = {}, {}, {}, {}
+concept_llm_folder = 'concept_embeds_umap_dim10'
+llm_folder = 'embedded_umap_dim10'
+batch_folder = 'batches_llm_10'
+use_llm = True
 
 if __name__ == "__main__":
+    # if batch_folder does not exist, create it
+    if not os.path.exists(f"../../data/graphs/{batch_folder}"):
+        os.makedirs(f"../../data/graphs/{batch_folder}")
+
     main()
