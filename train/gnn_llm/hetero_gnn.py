@@ -3,10 +3,10 @@ import deepsnap
 import torch.nn as nn
 import torch_geometric.nn as pyg_nn
 from torch_sparse import matmul
-from torchmetrics.regression import MeanAbsolutePercentageError
 
 train_args = {
-    "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    # "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    "device": "cuda",
     "hidden_size": 64,
     "epochs": 200,
     "weight_decay": 0.0002930387278908051,
@@ -100,11 +100,11 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
         """
 
         message_type_emb = {}
-        for message_key, edge_index in edge_indices.items():
+        for message_key, message_type in edge_indices.items():
             src_type, edge_type, dst_type = message_key
             node_feature_src = node_features[src_type]
             node_feature_dst = node_features[dst_type]
-            # edge_index = edge_indices[message_key]
+            edge_index = edge_indices[message_key]
             message_type_emb[message_key] = self.convs[message_key](
                 node_feature_src,
                 node_feature_dst,
@@ -236,6 +236,7 @@ class HeteroGNN(torch.nn.Module):
 
         # Initialize batch normalization and ReLU layers for each layer and node type
         all_node_types = hetero_graph.node_types
+        print(all_node_types)
         for i in range(self.num_layers):
             for node_type in all_node_types:
                 key_bn = f"bn_{i}_{node_type}"
@@ -277,7 +278,7 @@ class HeteroGNN(torch.nn.Module):
 
         return x
 
-    def loss(self, preds, y, indices):
+    def loss(self, preds, y):
         """
         Computes the loss for the model.
 
@@ -292,18 +293,23 @@ class HeteroGNN(torch.nn.Module):
 
         loss = 0
         loss_func = torch.nn.MSELoss()
+        
+        # print("PRED LOSS TRAIN")
+        # print(preds["event_target"])
+        # print(preds["event_target"].shape)
+        mse = torch.mean(torch.square(preds["event_target"] - y["event_target"]))
+        loss = mse
+        # loss += loss_func(preds["event_target"], y["event_target"])
 
-        # loss_func = mape
-        # MAPE PRODUCES BETTER EVAL RESULTS BUT WORSE PREDICTIONS
-
-        if self.mask_unknown:
-            mask = y["event"][indices["event"], 0] != -1
-            non_zero_idx = torch.masked_select(indices["event"], mask)
-
-            loss += loss_func(preds["event"][non_zero_idx], y["event"][non_zero_idx])
-        else:
-            # TODO: check if this is correct
-            idx = indices["event"]
-            loss += loss_func(preds["event"][id, y["event"][idx]])
-
+        #
+        # if self.mask_unknown:
+        #     mask = y["event"][indices["event"], 0] != -1
+        #     non_zero_idx = torch.masked_select(indices["event"], mask)
+        #
+        #     loss += loss_func(preds["event"][non_zero_idx], y["event"][non_zero_idx])
+        # else:
+        #     # TODO: check if this is correct
+        #     idx = indices["event"]
+        #     loss += loss_func(preds["event"][id , y["event"][idx]])
+        #
         return loss
