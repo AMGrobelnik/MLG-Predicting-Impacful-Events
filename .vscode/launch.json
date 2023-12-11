@@ -88,5 +88,18 @@
             "justMyCode": true,
             "cwd": "C:\\Users\\Adrian\\Desktop\\MLG-Predicting-Impacful-Events\\preprocess\\graph\\"
         },
+        {
+            "name": "Experimental tuning Nocturno",
+            "type": "python",
+            "request": "launch",
+            "program": "train_gnn_llm.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "C:\\Users\\adria\\Desktop\\MLG-Predicting-Impacful-Events\\train\\experimentation",
+            "args": [
+                "--mode",
+                "train"
+            ]
+        },
     ]
 }
