@@ -220,7 +220,7 @@ def objective(
     # Initialize wandb run
     aggr = trial.suggest_categorical("aggr", ["mean", "attn"])
     wandb.init(
-        project="V11_MLG_PredEvents_GNN+LMM",
+        project="V13_MLG_PredEvents_GNN+LMM",
         entity="mlg-events",
         dir=None,
         config={
@@ -631,6 +631,9 @@ def get_batches_from_pickle(folder_path):
         hetero_graph_cpu["node_target"] = hetero_graph_cpu._get_node_attributes(
             "node_target"
         )
+        
+        del hetero_graph.G
+        del hetero_graph_cpu.G
 
         # graph_tensors_to_device(hetero_graph)
         batches.append(hetero_graph)
@@ -651,7 +654,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    output_directory = "../../data/graphs/batches/"
+    output_directory = "../../data/graphs/batches/dim_reduced_10/"
     # batches = get_batches_from_pickle('../../data/graphs/neighborhood_sampling')
     train_batches, train_batches_cpu = get_batches_from_pickle(
         os.path.join(output_directory, "train")
