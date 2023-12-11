@@ -10,6 +10,7 @@
 /train/wandb/*
 /train/gnn_llm/wandb/*
 /train/gnn_llm/*.pkl
+wandb
 
 # User-specific stuff
 .idea/**/workspace.xml
