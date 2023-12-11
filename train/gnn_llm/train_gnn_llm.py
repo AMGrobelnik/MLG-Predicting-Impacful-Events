@@ -607,6 +607,25 @@ def display_predictions(preds, hetero_graph):
         print(f"{i:<6} | {predicted_value:<16} | {actual_value:<13} | {difference:<10}")
 
 
+def load_hetero_graph(G):
+    hete = HeteroGraph(G, netlib=nx, directed=True)
+    hete["node_target"] = hete._get_node_attributes("node_target")
+
+    for key in hete['node_target']:
+        node_target = hete['node_target'][key]
+        node_target = np.array(node_target)
+        hete['node_target'][key] = torch.tensor(node_target)
+
+    for key in hete['node_feature']:
+        node_feature = hete['node_feature'][key]
+        node_feature = np.array(node_feature)
+        hete['node_feature'][key] = torch.tensor(node_feature)
+
+    del hete.G
+
+    return hete
+
+
 def get_batches_from_pickle(folder_path):
     pickle_files = os.listdir(folder_path)
 
@@ -618,22 +637,10 @@ def get_batches_from_pickle(folder_path):
         print(file_path)
         with open(file_path, "rb") as f:
             G = pickle.load(f)
-        # G_cpu = copy.deepcopy(G)
-        # with open(file_path, "rb") as f:
-        #     G_cpu = pickle.load(f)
 
-        # print(type(G))
-
-        hetero_graph = HeteroGraph(G, netlib=nx, directed=True)
-        hetero_graph_cpu = HeteroGraph(G, netlib=nx, directed=True)
-
-        hetero_graph["node_target"] = hetero_graph._get_node_attributes("node_target")
-        hetero_graph_cpu["node_target"] = hetero_graph_cpu._get_node_attributes(
-            "node_target"
-        )
-        
-        del hetero_graph.G
-        del hetero_graph_cpu.G
+        hetero_graph = load_hetero_graph(G)
+        hetero_graph_cpu = load_hetero_graph(G)
+        del G
 
         # graph_tensors_to_device(hetero_graph)
         batches.append(hetero_graph)
@@ -650,6 +657,7 @@ if __name__ == "__main__":
         "--mode",
         type=str,
         choices=["train", "tune"],
+        default="train",
         help="Run mode: 'train' or 'tune'",
     )
     args = parser.parse_args()
