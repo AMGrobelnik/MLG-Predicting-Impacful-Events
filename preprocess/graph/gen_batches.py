@@ -5,6 +5,7 @@ import networkx as nx
 from tqdm import tqdm
 from glob import glob
 import torch
+from deepsnap.hetero_graph import HeteroGraph
 
 
 def load_data():
@@ -56,8 +57,13 @@ def batch_generate(subgraph_ids, event_index, batch_size):
         graphs = []
 
         for target_ids, neighbor_ids in batch:
+            tqdm.write("Generating subgraph...")
             graph = generate_subgraph(target_ids, neighbor_ids, event_index)
             graphs.append(graph)
+
+            tqdm.write("Converting to deepsnap...")
+            graph = HeteroGraph(graph, netlib=nx, directed=True)
+            graph['node_target'] = graph._get_node_attributes('node_target')
 
         # save batch
         tqdm.write(f"Saving batch {i}...")
@@ -174,6 +180,10 @@ def add_event(graph, event_id, e_type, all_nodes, src_file):
         if se_date < event_date:
             e_from, e_to = e_to, e_from
 
+        # no edges of type (event_target, similar, event)
+        if e_from == event_id and e_type == "event_target":
+            continue
+
         graph.add_edge(e_from, e_to, edge_type="similar")
 
     # add concepts
@@ -218,7 +228,7 @@ def generate_subgraph(target_ids, neighbor_ids, event_index):
 def main():
     subgraph_ids, event_index = load_data()
 
-    subgraph_ids = subgraph_ids[1500:2000]
+    subgraph_ids = subgraph_ids[0]
 
     batch_generate(subgraph_ids, event_index, 10)
 
