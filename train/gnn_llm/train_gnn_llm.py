@@ -231,7 +231,7 @@ def objective(
             if aggr == "attn"
             else 32,
             "epochs": trial.suggest_int("epochs", 10, 30),
-            "num_layers": trial.suggest_int("num_layers", 1, 10),
+            "num_layers": trial.suggest_int("num_layers", 1, 4),
             "aggr": aggr,
         },
     )
