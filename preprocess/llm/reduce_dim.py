@@ -1,69 +1,80 @@
 import pandas as pd
 import numpy as np
-import umap
 import os
+from umap.parametric_umap import ParametricUMAP
+import tensorflow as tf
+from umap.parametric_umap import load_ParametricUMAP
 
 
-event_filepath = "../../data/text/embedded"
-event_output = "../../data/text/embedded_umap_dim100"
-concept_filepath = "../../data/text/concept_embeds"
-concept_output = "../../data/text/concept_embeds_umap_dim100"
-
+input_dim = 768
 end_dim = 100
 
+event_filepath = "../../data/text/embedded"
+event_output = f"../../data/text/embedded_umap_dim{end_dim}"
+concept_filepath = "../../data/text/concept_embeds"
+concept_output = f"../../data/text/concept_embeds_umap_dim{end_dim}"
 
-umap_title = umap.UMAP(n_components=end_dim, random_state=42, verbose=True)
-umap_summary = umap.UMAP(n_components=end_dim, random_state=42, verbose=True)
-umap_concept = umap.UMAP(n_components=end_dim, random_state=42, verbose=True)
+
+def train_umap_model(umap_model):
+    llm_embeddings = []
+    # dfs = []
+    for i in range(1, 2):
+        df = pd.read_pickle(f"{event_filepath}/events-{i:05}.pkl")
+        # dfs.append(df['title'])
+        llm_embeddings.extend(df["title"].tolist())
+
+    for i in range(1, 2):
+        df = pd.read_pickle(f"{event_filepath}/events-{i:05}.pkl")
+        # dfs.append(df['summary'])
+        llm_embeddings.extend(df["summary"].tolist())
+    
+    for i in range(12, 13):
+        df = pd.read_pickle(f"{concept_filepath}/concept_embeds_{i}.pkl")
+        # dfs.append(df['label'])
+        llm_embeddings.extend(df["label"].to_list())
+
+    # bigDataFrame = pd.concat(dfs, ignore_index=True)
+    llm_embeddings = np.array(llm_embeddings)    
+    umap_model.fit(llm_embeddings)
+    return umap_model
 
 
-def reduce_event_emb(i):
+def reduce_event_emb(i, umap_model):
     df = pd.read_pickle(f"{event_filepath}/events-{i:05}.pkl")
 
     title_embeddings = np.array(df["title"].tolist())
     summary_embeddings = np.array(df["summary"].tolist())
 
-    # Apply UMAP reduction to title embeddings
-    umap_title_result = umap_title.fit_transform(title_embeddings)
-
-    # Apply UMAP reduction to summary embeddings
-    umap_summary_result = umap_summary.fit_transform(summary_embeddings)
-
-    # Add UMAP results as new columns in the DataFrame
+    umap_title_result = umap_model.transform(title_embeddings)
+    umap_summary_result = umap_model.transform(summary_embeddings)
 
     df = df.drop("title", axis=1)
     df = df.drop("summary", axis=1)
     df["title"] = [x for x in umap_title_result]
     df["summary"] = [x for x in umap_summary_result]
-
-    # print(df.iloc[19]['title'].shape)
-
     df.to_pickle(f"{event_output}/events-{i:05}.pkl")
 
 
 def reduce_concept_emb(i):
     df = pd.read_pickle(f"{concept_filepath}/concept_embeds_{i}.pkl")
-    # print(df)
 
     concept_embeddings = np.array(df["label"].tolist())
-
-    umap_concept_result = umap_concept.fit_transform(concept_embeddings)
+    umap_concept_result = umap_model.fit_transform(concept_embeddings)
 
     df = df.drop("label", axis=1)
-    # print(umap_concept_result)
     df["label"] = [x for x in umap_concept_result]
 
     df.to_pickle(f"{concept_output}/concept_embeds_{i}.pkl")
 
 
-def reduce_event_dim():
+def reduce_event_dim(umap_model):
     if not os.path.exists(event_output):
         os.makedirs(event_output)
 
     i = 1
     while os.path.exists(f"{event_filepath}/events-{i:05}.pkl"):
         if not os.path.exists(f"{event_output}/events-{i:05}.pkl"):
-            reduce_event_emb(i)
+            reduce_event_emb(i, umap_model)
             print(f"Processed event: {i}")
         i += 1
 
@@ -80,7 +91,24 @@ def reduce_concept_dim():
 
 
 if __name__ == "__main__":
+    umap_model = None
+    if os.path.exists("best_umap_model.pkl"):
+        umap_model = load_ParametricUMAP('best_umap_model.pkl')
+    else:
+        encoder = tf.keras.Sequential([
+            tf.keras.layers.InputLayer(input_shape=(input_dim,)),
+            tf.keras.layers.Dense(units=512, activation="relu"),
+            tf.keras.layers.Dense(units=256, activation="relu"),
+            tf.keras.layers.Dense(units=128, activation="relu"),
+            tf.keras.layers.Dense(units=end_dim)
+        ])
+
+        umap_model = ParametricUMAP(encoder=encoder, n_epochs=50, n_components=end_dim, random_state=42, verbose=True)
+        umap_model = train_umap_model(umap_model)
+        umap_model.save('best_umap_model.pkl')
+        print("Training done")
+
     print("Reducing Event Embedding Dimensionality")
-    reduce_event_dim()
-    print("Reducing Concept Embedding Dimensionality")
-    reduce_concept_dim()
+    reduce_event_dim(umap_model)
+    # print("Reducing Concept Embedding Dimensionality")
+    # reduce_concept_dim()
