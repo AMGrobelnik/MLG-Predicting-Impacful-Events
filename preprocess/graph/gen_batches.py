@@ -42,7 +42,7 @@ def save_batch(graphs, start_index, hetero):
 
 
 def get_hetero_graph(G):
-    hete = HeteroGraph(G, netlib=nx, directed=True)
+    hete = HeteroGraph(G, directed=True)
     hete["node_target"] = hete._get_node_attributes("node_target")
 
     for key in hete["node_target"]:
@@ -200,7 +200,7 @@ def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file, target_ids
     event = src_file[event_id]
     info = event["info"]
     event_counts = info["articleCounts"]["total"]
-    event_date = info["eventDate"]
+    event_date = info["eventDate"] / 16600  # normalize by max date
     concepts = info["concepts"]
     similar = event["similar_events"]
 
@@ -301,7 +301,7 @@ def main():
     if use_llm:
         load_concept_llm_files()
 
-    subgraph_ids = subgraph_ids[:1]
+    # subgraph_ids = subgraph_ids[:1]
     batch_generate(subgraph_ids, event_index, 1)
 
 
