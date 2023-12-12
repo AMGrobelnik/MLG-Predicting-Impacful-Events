@@ -310,7 +310,7 @@ def display_predictions(preds, hetero_graph):
 
 if __name__ == "__main__":
     # Load the data
-    base_dir = "../../data/graphs/batches/gnn_only/"
+    base_dir = "../data/graphs/batches/gnn_only/"
     train_dataset = BatchDataset(base_dir + "train")
     val_dataset = BatchDataset(base_dir + "val")
     test_dataset = BatchDataset(base_dir + "test")

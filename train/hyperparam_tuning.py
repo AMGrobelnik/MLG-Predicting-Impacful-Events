@@ -34,7 +34,7 @@ def objective(trial, train_set, validation_set, test_set):
     aggr = trial.suggest_categorical("aggr", ["mean", "attn"])
 
     wandb.init(
-        project="",
+        project="test-hyperparam-tuning",
         entity="mlg-events",
         dir=None,
         config={
@@ -45,6 +45,7 @@ def objective(trial, train_set, validation_set, test_set):
             "epochs": trial.suggest_int("epochs", 20, 400),
             "num_layers": trial.suggest_int("num_layers", 3, 5),
             "aggr": aggr,
+            "device": "cuda" if torch.cuda.is_available() else "cpu",
         },
     )
 
@@ -64,7 +65,9 @@ def objective(trial, train_set, validation_set, test_set):
             }
         )
 
-    _, best_loss = train_gnn.train_model(train_set, validation_set, config, log=epoch_log)
+    _, best_loss = train_gnn.train_model(
+        train_set, validation_set, config, log=epoch_log
+    )
     wandb.log({"best_metric_val_loss": best_loss})
 
     test_losses = train_gnn.test_model(train_set, test_set, config)
@@ -77,3 +80,68 @@ def objective(trial, train_set, validation_set, test_set):
         }
     )
     wandb.finish()
+
+
+import torch
+from gnn_llm.hetero_gnn import HeteroGNN
+from torch.utils.data import Dataset
+from pathlib import Path
+from glob import glob
+import pickle
+import numpy as np
+
+
+train_args = {
+    "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    "hidden_size": 81,
+    "epochs": 30,
+    "weight_decay": 0.00002203762357664057,
+    "lr": 0.003873757421883433,
+    "attn_size": 32,
+    "num_layers": 6,
+    "aggr": "attn",
+}
+
+
+class BatchDataset(Dataset):
+    """
+    Dataset for loading heterograph objects of data from a folder.
+    TODO: unload from RAM if needed
+    """
+
+    def __init__(self, folder_path, keep_in_memory=False):
+        super().__init__()
+        folder_path = Path(folder_path)
+        batch_files = glob(str(folder_path / "batch*.pkl"))
+
+        self.folder_path = folder_path
+        self.batch_files = batch_files
+        self.loaded = {}
+        self.keep_in_memory = keep_in_memory
+
+    def __len__(self):
+        return len(self.batch_files)
+
+    def __getitem__(self, idx):
+        if self.keep_in_memory and idx in self.loaded:
+            return self.loaded[idx]
+
+        batch_file = self.batch_files[idx]
+
+        with open(batch_file, "rb") as f:
+            batch = pickle.load(f)
+
+        if self.keep_in_memory:
+            self.loaded[idx] = batch
+
+        return batch
+
+
+if __name__ == "__main__":
+    # Load the data
+    base_dir = "../data/graphs/batches/gnn_only/"
+    train_dataset = BatchDataset(base_dir + "train")
+    val_dataset = BatchDataset(base_dir + "val")
+    test_dataset = BatchDataset(base_dir + "test")
+
+    hyper_parameter_tuning(train_dataset, val_dataset, test_dataset)
