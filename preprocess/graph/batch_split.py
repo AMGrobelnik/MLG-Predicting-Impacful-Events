@@ -72,7 +72,7 @@ if __name__ == "__main__":
     val_split = 0.15
     test_split = 0.15
 
-    sample_fraction = 0.2
+    sample_fraction = 0.1
 
     # Process each folder
     create_splits_for_folder(

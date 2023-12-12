@@ -220,7 +220,7 @@ def objective(
     # Initialize wandb run
     aggr = trial.suggest_categorical("aggr", ["mean", "attn"])
     wandb.init(
-        project="V13_MLG_PredEvents_GNN+LMM",
+        project="gnn_only",
         entity="mlg-events",
         dir=None,
         config={
@@ -230,7 +230,7 @@ def objective(
             "attn_size": trial.suggest_int("attn_size", 16, 128)
             if aggr == "attn"
             else 32,
-            "epochs": trial.suggest_int("epochs", 150, 300),
+            "epochs": trial.suggest_int("epochs", 10, 30),
             "num_layers": trial.suggest_int("num_layers", 1, 10),
             "aggr": aggr,
         },
@@ -455,7 +455,7 @@ def hyper_parameter_tuning(
             val_batches_cpu,
             test_batches_cpu,
         ),
-        n_trials=100,
+        n_trials=500,
     )
 
     print("Best trial:")
@@ -611,15 +611,15 @@ def load_hetero_graph(G):
     hete = HeteroGraph(G, netlib=nx, directed=True)
     hete["node_target"] = hete._get_node_attributes("node_target")
 
-    for key in hete['node_target']:
-        node_target = hete['node_target'][key]
+    for key in hete["node_target"]:
+        node_target = hete["node_target"][key]
         node_target = np.array(node_target)
-        hete['node_target'][key] = torch.tensor(node_target)
+        hete["node_target"][key] = torch.tensor(node_target)
 
-    for key in hete['node_feature']:
-        node_feature = hete['node_feature'][key]
+    for key in hete["node_feature"]:
+        node_feature = hete["node_feature"][key]
         node_feature = np.array(node_feature)
-        hete['node_feature'][key] = torch.tensor(node_feature)
+        hete["node_feature"][key] = torch.tensor(node_feature)
 
     del hete.G
 
@@ -662,7 +662,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    output_directory = "../../data/graphs/batches/dim_reduced_10/"
+    output_directory = "../../data/graphs/batches/gnn_only/"
     # batches = get_batches_from_pickle('../../data/graphs/neighborhood_sampling')
     train_batches, train_batches_cpu = get_batches_from_pickle(
         os.path.join(output_directory, "train")
