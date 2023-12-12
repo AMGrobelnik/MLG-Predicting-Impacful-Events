@@ -224,14 +224,14 @@ def objective(
         entity="mlg-events",
         dir=None,
         config={
-            "lr": trial.suggest_float("lr", 1e-5, 1e-1, log=True),
+            "lr": trial.suggest_float("lr", 1e-6, 1e-2, log=True),
             "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True),
-            "hidden_size": trial.suggest_int("hidden_size", 16, 128),
-            "attn_size": trial.suggest_int("attn_size", 16, 128)
+            "hidden_size": trial.suggest_int("hidden_size", 16, 1024, log=True),
+            "attn_size": trial.suggest_int("attn_size", 32, 1024, log=True)
             if aggr == "attn"
             else 32,
-            "epochs": trial.suggest_int("epochs", 20, 50),
-            "num_layers": trial.suggest_int("num_layers", 1, 4),
+            "epochs": 30,  # trial.suggest_int("epochs", 20, 40),
+            "num_layers": trial.suggest_int("num_layers", 3, 5),
             "aggr": aggr,
         },
     )
