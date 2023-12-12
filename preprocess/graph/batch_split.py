@@ -45,12 +45,11 @@ def create_splits_for_folder(
     # Calculate split indices
     train_end = int(len(sampled_files) * train_split)
     val_end = train_end + int(len(sampled_files) * val_split)
-    test_end = train_end + val_end + int(len(sampled_files) * test_split)
 
     # Split files
     train_files = sampled_files[:train_end]
     val_files = sampled_files[train_end:val_end]
-    test_files = sampled_files[val_end:test_end]
+    test_files = sampled_files[val_end:]
 
     # Copy files to respective directories
     for file in train_files:
@@ -69,13 +68,15 @@ if __name__ == "__main__":
     folders = ["dim_reduced_10", "dim_reduced_100", "gnn_only", "llm_embeddings_full"]
 
     # Split ratios
-    train_split = 0.8
-    val_split = 0.1
-    test_split = 0.1
+    train_split = 0.7
+    val_split = 0.15
+    test_split = 0.15
+
+    sample_fraction = 0.2
 
     # Process each folder
     create_splits_for_folder(
-        base_dir, "dim_reduced_10", train_split, val_split, test_split
+        base_dir, "gnn_only", train_split, val_split, test_split, sample_fraction
     )
     # for folder in folders:
     # create_splits_for_folder(folder)
