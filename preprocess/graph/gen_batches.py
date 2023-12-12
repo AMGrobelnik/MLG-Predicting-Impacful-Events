@@ -4,6 +4,9 @@ import os
 import networkx as nx
 from tqdm import tqdm
 from glob import glob
+from deepsnap.hetero_graph import HeteroGraph
+from torch_sparse import SparseTensor
+import torch
 
 
 def load_data():
@@ -27,13 +30,47 @@ def reverse_event_index(event_index):
     return new_index
 
 
-def save_batch(graphs, start_index):
+def save_batch(graphs, start_index, hetero):
     global batch_folder
 
     for i, graph in enumerate(graphs):
-        file_name = f"batch_{str(start_index + i).zfill(5)}.pkl"
+        file_name = (
+            f"batch{'_hg' if hetero else ''}_{str(start_index + i).zfill(5)}.pkl"
+        )
         with open(f"../../data/graphs/{batch_folder}/" + file_name, "wb") as f:
             pickle.dump(graph, f)
+
+
+def get_hetero_graph(G):
+    hete = HeteroGraph(G, netlib=nx, directed=True)
+    hete["node_target"] = hete._get_node_attributes("node_target")
+
+    for key in hete["node_target"]:
+        node_target = hete["node_target"][key]
+        node_target = np.array(node_target)
+        hete["node_target"][key] = torch.tensor(node_target, dtype=torch.float32)
+
+    for key in hete["node_feature"]:
+        node_feature = hete["node_feature"][key]
+        node_feature = np.array(node_feature)
+        hete["node_feature"][key] = torch.tensor(node_feature, dtype=torch.float32)
+
+    for key in hete.edge_index:
+        edge_index = hete.edge_index[key]
+
+        adj = SparseTensor(
+            row=edge_index[0].long(),
+            col=edge_index[1].long(),
+            sparse_sizes=(
+                hete.num_nodes(key[0]),
+                hete.num_nodes(key[2]),
+            ),
+        )
+        hete.edge_index[key] = adj.t()
+
+    del hete.G
+
+    return hete
 
 
 def batch_generate(subgraph_ids, event_index, batch_size):
@@ -44,6 +81,7 @@ def batch_generate(subgraph_ids, event_index, batch_size):
     :param batch_size: number of graphs to construct at the same time
     :return:
     """
+    global save_deepsnap, save_nx
 
     # split subgraph_ids into batches
     batched_ids = [
@@ -55,14 +93,24 @@ def batch_generate(subgraph_ids, event_index, batch_size):
     i = 0
     for batch in tqdm(batched_ids, desc="Generating batches"):
         graphs = []
+        hetero_graphs = []
 
         for target_ids, neighbor_ids in batch:
             graph = generate_subgraph(target_ids, neighbor_ids, event_index)
             graphs.append(graph)
 
+            if save_deepsnap:
+                hg = get_hetero_graph(graph)
+                hetero_graphs.append(hg)
+
         # save batch
         tqdm.write(f"Saving batch {i}...")
-        save_batch(graphs, i)
+        if save_nx:
+            save_batch(graphs, i, hetero=False)
+
+        if save_deepsnap:
+            save_batch(hetero_graphs, i, hetero=True)
+
         i += batch_size
 
 
@@ -171,7 +219,7 @@ def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file, target_ids
         llm = llm_file.loc[event_id]
         title = llm["title"]
         summary = llm["summary"]
-        features = np.concatenate([features, title, summary], axis=0)
+        features = np.concatenate([features, title, summary], axis=0, dtype=np.float32)
 
     # add node
     if e_type == "event":
@@ -193,7 +241,7 @@ def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file, target_ids
             e_from, e_to = e_to, e_from
 
         # no edges of type (event_target, similar, event)
-        if e_from in target_ids:
+        if e_from in target_ids or e_type == "event_target":
             continue
 
         graph.add_edge(e_from, e_to, edge_type="similar")
@@ -241,7 +289,9 @@ def generate_subgraph(target_ids, neighbor_ids, event_index):
                 continue
 
             llm = get_concept_llm(node)
-            graph.nodes[node]["node_feature"] = np.concatenate([deg, llm], axis=0)
+            graph.nodes[node]["node_feature"] = np.concatenate(
+                [deg, llm], axis=0, dtype=np.float32
+            )
 
     return graph
 
@@ -260,11 +310,16 @@ concept_llm_folder = "concept_embeds_umap_dim10"
 llm_folder = "embedded_umap_dim10"
 use_llm = True
 
+save_deepsnap = True
+save_nx = False
 batch_folder = "batches_llm_10"
 
 if __name__ == "__main__":
     # if batch_folder does not exist, create it
     if not os.path.exists(f"../../data/graphs/{batch_folder}"):
         os.makedirs(f"../../data/graphs/{batch_folder}")
+
+    if not (save_deepsnap or save_nx):
+        raise ValueError("Must save at least one type of graph")
 
     main()
