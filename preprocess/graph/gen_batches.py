@@ -5,6 +5,7 @@ import networkx as nx
 from tqdm import tqdm
 from glob import glob
 from deepsnap.hetero_graph import HeteroGraph
+from torch_sparse import SparseTensor
 import torch
 
 
@@ -53,6 +54,19 @@ def get_hetero_graph(G):
         node_feature = hete["node_feature"][key]
         node_feature = np.array(node_feature)
         hete["node_feature"][key] = torch.tensor(node_feature, dtype=torch.float32)
+
+    for key in hete.edge_index:
+        edge_index = hete.edge_index[key]
+
+        adj = SparseTensor(
+            row=edge_index[0].long(),
+            col=edge_index[1].long(),
+            sparse_sizes=(
+                hete.num_nodes(key[0]),
+                hete.num_nodes(key[2]),
+            ),
+        )
+        hete.edge_index[key] = adj.t()
 
     del hete.G
 
@@ -304,7 +318,7 @@ if __name__ == "__main__":
     # if batch_folder does not exist, create it
     if not os.path.exists(f"../../data/graphs/{batch_folder}"):
         os.makedirs(f"../../data/graphs/{batch_folder}")
-        
+
     if not (save_deepsnap or save_nx):
         raise ValueError("Must save at least one type of graph")
 
