@@ -1,6 +1,13 @@
 import train_gnn
 import optuna
 import wandb
+import torch
+from gnn_llm.hetero_gnn import HeteroGNN
+from torch.utils.data import Dataset
+from pathlib import Path
+from glob import glob
+import pickle
+import numpy as np
 
 
 def hyper_parameter_tuning(train_set, validation_set, test_set):
@@ -34,7 +41,7 @@ def objective(trial, train_set, validation_set, test_set):
     aggr = trial.suggest_categorical("aggr", ["mean", "attn"])
 
     wandb.init(
-        project="test-hyperparam-tuning",
+        project="llm_full",
         entity="mlg-events",
         dir=None,
         config={
@@ -42,7 +49,7 @@ def objective(trial, train_set, validation_set, test_set):
             "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True),
             "hidden_size": trial.suggest_int("hidden_size", 16, 1024, log=True),
             "attn_size": trial.suggest_int("attn_size", 32, 1024, log=True),
-            "epochs": trial.suggest_int("epochs", 20, 40),
+            "epochs": trial.suggest_int("epochs", 1, 2),
             "num_layers": trial.suggest_int("num_layers", 3, 5),
             "aggr": aggr,
             "device": "cuda" if torch.cuda.is_available() else "cpu",
@@ -81,26 +88,7 @@ def objective(trial, train_set, validation_set, test_set):
     )
     wandb.finish()
 
-
-import torch
-from gnn_llm.hetero_gnn import HeteroGNN
-from torch.utils.data import Dataset
-from pathlib import Path
-from glob import glob
-import pickle
-import numpy as np
-
-
-train_args = {
-    "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-    "hidden_size": 81,
-    "epochs": 30,
-    "weight_decay": 0.00002203762357664057,
-    "lr": 0.003873757421883433,
-    "attn_size": 32,
-    "num_layers": 6,
-    "aggr": "attn",
-}
+    return best_loss
 
 
 class BatchDataset(Dataset):
@@ -139,7 +127,7 @@ class BatchDataset(Dataset):
 
 if __name__ == "__main__":
     # Load the data
-    base_dir = "../data/graphs/batches/gnn_only/"
+    base_dir = "../data/graphs/batches/batches_llm_full/"
     train_dataset = BatchDataset(base_dir + "train")
     val_dataset = BatchDataset(base_dir + "val")
     test_dataset = BatchDataset(base_dir + "test")
