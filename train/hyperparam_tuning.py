@@ -49,7 +49,7 @@ def objective(trial, train_set, validation_set, test_set):
             "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True),
             "hidden_size": trial.suggest_int("hidden_size", 16, 1024, log=True),
             "attn_size": trial.suggest_int("attn_size", 32, 1024, log=True),
-            "epochs": trial.suggest_int("epochs", 1, 2),
+            "epochs": trial.suggest_int("epochs", 20, 40),
             "num_layers": trial.suggest_int("num_layers", 3, 5),
             "aggr": aggr,
             "device": "cuda" if torch.cuda.is_available() else "cpu",
