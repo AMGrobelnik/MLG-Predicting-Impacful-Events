@@ -26,7 +26,7 @@ train_args = {
     # "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     "device": "cuda",
     "hidden_size": 81,
-    "epochs": 10,
+    "epochs": 30,
     "weight_decay": 0.00002203762357664057,
     "lr": 0.003873757421883433,
     "attn_size": 32,
@@ -230,7 +230,7 @@ def objective(
             "attn_size": trial.suggest_int("attn_size", 16, 128)
             if aggr == "attn"
             else 32,
-            "epochs": trial.suggest_int("epochs", 10, 30),
+            "epochs": trial.suggest_int("epochs", 20, 50),
             "num_layers": trial.suggest_int("num_layers", 1, 4),
             "aggr": aggr,
         },
