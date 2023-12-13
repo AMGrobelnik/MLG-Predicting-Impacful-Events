@@ -1,13 +1,10 @@
 import train_gnn
 import optuna
 import wandb
-import torch
-from gnn_llm.hetero_gnn import HeteroGNN
 from torch.utils.data import Dataset
 from pathlib import Path
 from glob import glob
 import pickle
-import numpy as np
 
 
 def hyper_parameter_tuning(train_set, validation_set, test_set, device):
@@ -40,18 +37,17 @@ def objective(trial, train_set, validation_set, test_set, device):
     )
 
     wandb.init(
-        project="llm_full",
+        project="llm_full_10p",
         entity="mlg-events",
         dir=None,
         config={
-            "lr": trial.suggest_float("lr", 1e-5, 1e-3, log=True),
+            "lr": trial.suggest_float("lr", 1e-6, 1e-2, log=True),
             "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True),
             "hidden_size": trial.suggest_int("hidden_size", 16, 256, log=True),
-            "attn_size": trial.suggest_int("attn_size", 32, 256, log=True),
+            "attn_size": attn_size,
             "epochs": trial.suggest_int("epochs", 20, 40),
             "num_layers": trial.suggest_int("num_layers", 3, 5),
             "aggr": aggr,
-            "device": "cuda" if torch.cuda.is_available() else "cpu",
         },
     )
 
