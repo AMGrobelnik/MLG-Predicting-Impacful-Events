@@ -4,6 +4,7 @@ import os
 from umap.parametric_umap import ParametricUMAP
 import tensorflow as tf
 from umap.parametric_umap import load_ParametricUMAP
+from random import sample
 
 
 input_dim = 768
@@ -16,26 +17,21 @@ concept_output = f"../../data/text/concept_embeds_umap_dim{end_dim}"
 
 
 def train_umap_model(umap_model):
-    llm_embeddings = []
-    # dfs = []
-    for i in range(1, 2):
+    all_dfs = []
+    for i in sample(range(1, 2700), 100):
         df = pd.read_pickle(f"{event_filepath}/events-{i:05}.pkl")
-        # dfs.append(df['title'])
-        llm_embeddings.extend(df["title"].tolist())
+        all_dfs.append(df["title"])
 
-    for i in range(1, 2):
+    for i in sample(range(1, 2700), 100):
         df = pd.read_pickle(f"{event_filepath}/events-{i:05}.pkl")
-        # dfs.append(df['summary'])
-        llm_embeddings.extend(df["summary"].tolist())
-    
-    for i in range(12, 13):
+        all_dfs.append(df["summary"])
+
+    for i in sample(range(12, 13), 1):
         df = pd.read_pickle(f"{concept_filepath}/concept_embeds_{i}.pkl")
-        # dfs.append(df['label'])
-        llm_embeddings.extend(df["label"].to_list())
+        all_dfs.append(df["label"])
 
-    # bigDataFrame = pd.concat(dfs, ignore_index=True)
-    llm_embeddings = np.array(llm_embeddings)    
-    umap_model.fit(llm_embeddings)
+    all_dfs = pd.concat(all_dfs, ignore_index=True)
+    umap_model.fit(all_dfs.to_list())
     return umap_model
 
 
@@ -55,7 +51,7 @@ def reduce_event_emb(i, umap_model):
     df.to_pickle(f"{event_output}/events-{i:05}.pkl")
 
 
-def reduce_concept_emb(i):
+def reduce_concept_emb(i, umap_model):
     df = pd.read_pickle(f"{concept_filepath}/concept_embeds_{i}.pkl")
 
     concept_embeddings = np.array(df["label"].tolist())
@@ -79,36 +75,45 @@ def reduce_event_dim(umap_model):
         i += 1
 
 
-def reduce_concept_dim():
+def reduce_concept_dim(uamp_model):
     if not os.path.exists(concept_output):
         os.makedirs(concept_output)
 
     i = 1
     while os.path.exists(f"{concept_filepath}/concept_embeds_{i}.pkl"):
-        reduce_concept_emb(i)
+        reduce_concept_emb(i, umap_model)
         print(f"Processed concept: {i}")
         i += 1
 
 
 if __name__ == "__main__":
     umap_model = None
-    if os.path.exists("best_umap_model.pkl"):
-        umap_model = load_ParametricUMAP('best_umap_model.pkl')
+    if os.path.exists(f"best_umap_model_dim{end_dim}"):
+        print("Loading model")
+        umap_model = load_ParametricUMAP(f"best_umap_model{end_dim}")
     else:
-        encoder = tf.keras.Sequential([
-            tf.keras.layers.InputLayer(input_shape=(input_dim,)),
-            tf.keras.layers.Dense(units=512, activation="relu"),
-            tf.keras.layers.Dense(units=256, activation="relu"),
-            tf.keras.layers.Dense(units=128, activation="relu"),
-            tf.keras.layers.Dense(units=end_dim)
-        ])
+        encoder = tf.keras.Sequential(
+            [
+                tf.keras.layers.InputLayer(input_shape=(input_dim,)),
+                tf.keras.layers.Dense(units=512, activation="relu"),
+                tf.keras.layers.Dense(units=256, activation="relu"),
+                tf.keras.layers.Dense(units=128, activation="relu"),
+                tf.keras.layers.Dense(units=end_dim),
+            ]
+        )
 
-        umap_model = ParametricUMAP(encoder=encoder, n_epochs=50, n_components=end_dim, random_state=42, verbose=True)
+        umap_model = ParametricUMAP(
+            encoder=encoder,
+            n_epochs=50,
+            n_components=end_dim,
+            random_state=42,
+            verbose=True,
+        )
         umap_model = train_umap_model(umap_model)
-        umap_model.save('best_umap_model.pkl')
+        umap_model.save(f"best_umap_model{end_dim}")
         print("Training done")
 
     print("Reducing Event Embedding Dimensionality")
     reduce_event_dim(umap_model)
-    # print("Reducing Concept Embedding Dimensionality")
-    # reduce_concept_dim()
+    print("Reducing Concept Embedding Dimensionality")
+    reduce_concept_dim(umap_model)
