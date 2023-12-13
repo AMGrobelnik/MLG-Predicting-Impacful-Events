@@ -247,12 +247,13 @@ def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file, target_ids
         graph.add_edge(e_from, e_to, edge_type="similar")
 
     # add concepts
-    for concept in concepts:
-        concept_id = concept["id"]
+    if use_concepts:
+        for concept in concepts:
+            concept_id = concept["id"]
 
-        graph.add_node(concept_id, node_type="concept")
-        graph.add_edge(concept_id, event_id, edge_type="related")
-        graph.add_edge(concept_id, concept_id, edge_type="concept_self")
+            graph.add_node(concept_id, node_type="concept")
+            graph.add_edge(concept_id, event_id, edge_type="related")
+            graph.add_edge(concept_id, concept_id, edge_type="concept_self")
 
 
 def generate_subgraph(target_ids, neighbor_ids, event_index):
@@ -263,7 +264,7 @@ def generate_subgraph(target_ids, neighbor_ids, event_index):
     :param event_index: maps event ids -> file names
     :return:
     """
-    global src_files, llm_files, concept_llms, use_llm
+    global src_files, llm_files, concept_llms, use_llm, use_concepts
 
     # get files to idx
     files_to_idx, all_nodes = get_files_to_idx(target_ids, neighbor_ids, event_index)
@@ -298,21 +299,22 @@ def generate_subgraph(target_ids, neighbor_ids, event_index):
 
 def main():
     subgraph_ids, event_index = load_data()
-    if use_llm:
+    if use_llm and use_concepts:
         load_concept_llm_files()
 
-    # subgraph_ids = subgraph_ids[:1]
+    subgraph_ids = subgraph_ids[:1]
     batch_generate(subgraph_ids, event_index, 1)
 
 
 src_files, llm_files, concept_llms, concept_ids = {}, {}, {}, {}
-concept_llm_folder = "concept_embeds_umap_dim10"
-llm_folder = "embedded_umap_dim10"
+concept_llm_folder = "concept_embeds"
+llm_folder = "embedded"
 use_llm = True
+use_concepts = True
 
 save_deepsnap = True
 save_nx = False
-batch_folder = "batches_llm_10"
+batch_folder = "batches_llm_no_concept"
 
 if __name__ == "__main__":
     # if batch_folder does not exist, create it
