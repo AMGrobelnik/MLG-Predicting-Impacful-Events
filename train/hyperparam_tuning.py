@@ -128,4 +128,4 @@ if __name__ == "__main__":
     val_dataset = BatchDataset(base_dir + "val")
     test_dataset = BatchDataset(base_dir + "test")
 
-    hyper_parameter_tuning(train_dataset, val_dataset, test_dataset)
+    hyper_parameter_tuning(train_dataset, val_dataset, test_dataset, "cuda")
