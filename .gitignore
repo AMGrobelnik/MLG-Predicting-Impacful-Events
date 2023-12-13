@@ -12,6 +12,14 @@
 /train/gnn_llm/*.pkl
 wandb
 
+/data/batches/train/*
+/data/batches/test/*
+/data/batches/val/*
+
+/data/testing_batches/train/*
+/data/testing_batches/test/*
+/data/testing_batches/val/*
+
 # User-specific stuff
 .idea/**/workspace.xml
 .idea/**/tasks.xml
