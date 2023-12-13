@@ -62,7 +62,7 @@ def create_splits_for_folder(
 
 if __name__ == "__main__":
     # Set the base directory using relative paths
-    base_dir = os.path.join("../../data/graphs/batches")
+    base_dir = os.path.join("../data/graphs/batches")
 
     # List of new folders to process
     folders = ["dim_reduced_10", "dim_reduced_100", "gnn_only", "llm_embeddings_full"]

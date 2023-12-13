@@ -10,7 +10,7 @@ import pickle
 import numpy as np
 
 
-def hyper_parameter_tuning(train_set, validation_set, test_set):
+def hyper_parameter_tuning(train_set, validation_set, test_set, device):
     """
     Hyperparameter tuning for the GNN model
     :param train_set: set of training data
@@ -20,12 +20,7 @@ def hyper_parameter_tuning(train_set, validation_set, test_set):
     study = optuna.create_study(direction="minimize")
 
     study.optimize(
-        lambda trial: objective(
-            trial,
-            train_set,
-            validation_set,
-            test_set,
-        ),
+        lambda trial: objective(trial, train_set, validation_set, test_set, device),
         n_trials=500,
     )
 
@@ -37,8 +32,12 @@ def hyper_parameter_tuning(train_set, validation_set, test_set):
         print(f"    {key}: {value}")
 
 
-def objective(trial, train_set, validation_set, test_set):
+def objective(trial, train_set, validation_set, test_set, device):
     aggr = trial.suggest_categorical("aggr", ["mean", "attn"])
+
+    attn_size = (
+        0 if aggr == "mean" else trial.suggest_int("attn_size", 32, 400, log=True)
+    )
 
     wandb.init(
         project="llm_full",
@@ -48,15 +47,15 @@ def objective(trial, train_set, validation_set, test_set):
             "lr": trial.suggest_float("lr", 1e-6, 1e-2, log=True),
             "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True),
             "hidden_size": trial.suggest_int("hidden_size", 16, 1024, log=True),
-            "attn_size": trial.suggest_int("attn_size", 32, 1024, log=True),
+            "attn_size": attn_size,
             "epochs": trial.suggest_int("epochs", 20, 40),
             "num_layers": trial.suggest_int("num_layers", 3, 5),
             "aggr": aggr,
-            "device": "cuda" if torch.cuda.is_available() else "cpu",
         },
     )
 
     config = wandb.config
+    config["device"] = device
 
     def epoch_log(epoch, train_losses, val_losses):
         wandb.log(

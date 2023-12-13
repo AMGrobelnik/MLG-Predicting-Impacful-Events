@@ -1,22 +1,10 @@
 import torch
-from gnn_llm.hetero_gnn import HeteroGNN
+from hetero_gnn import HeteroGNN
 from torch.utils.data import Dataset
 from pathlib import Path
 from glob import glob
 import pickle
 import numpy as np
-
-
-train_args = {
-    "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-    "hidden_size": 81,
-    "epochs": 30,
-    "weight_decay": 0.00002203762357664057,
-    "lr": 0.003873757421883433,
-    "attn_size": 32,
-    "num_layers": 6,
-    "aggr": "attn",
-}
 
 
 class BatchDataset(Dataset):
@@ -159,11 +147,13 @@ def graph_unload(graph):
     return graph
 
 
-def train_model(train_set, val_set, train_args, log=None):
+def train_model(train_set: Dataset, val_set: Dataset, train_args, log=None):
     """
     Trains and evaluates the model on the given data loaders.
     :param train_set: set of training data
     :param val_set: set of validation data
+    :param train_args: dictionary of training arguments
+    :param log: function to log training progress after each epoch
     :return: The trained model.
     """
 
@@ -174,9 +164,7 @@ def train_model(train_set, val_set, train_args, log=None):
         train_set[0],
         train_args,
         num_layers=train_args["num_layers"],
-        aggr=train_args["aggr"],
-        return_embedding=False,
-        mask_unknown=True,
+        aggr=train_args["aggr"]
     )
     # Move the model to the GPU if available
     model = model.to(train_args["device"])
@@ -309,6 +297,17 @@ def display_predictions(preds, hetero_graph):
 
 
 if __name__ == "__main__":
+    train_args = {
+        "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        "hidden_size": 81,
+        "epochs": 30,
+        "weight_decay": 0.00002203762357664057,
+        "lr": 0.003873757421883433,
+        "attn_size": 32,
+        "num_layers": 6,
+        "aggr": "attn",
+    }
+
     # Load the data
     base_dir = "../data/graphs/batches/gnn_only/"
     train_dataset = BatchDataset(base_dir + "train")
