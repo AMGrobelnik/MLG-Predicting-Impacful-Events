@@ -22,53 +22,37 @@
             "name": "GNN Training Surface",
             "type": "python",
             "request": "launch",
-            "program": "train_gnn_llm.py",
+            "program": "train_gnn.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "C:\\Users\\Adrian\\Desktop\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
-            "args": [
-                "--mode",
-                "train"
-            ]
+            "cwd": "C:\\Users\\Adrian\\Desktop\\MLG-Predicting-Impacful-Events\\train",
         },
         {
             "name": "Hyperparameter tuning Surface",
             "type": "python",
             "request": "launch",
-            "program": "train_gnn_llm.py",
+            "program": "hyperparam_tuning.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "C:\\Users\\Adrian\\Desktop\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
-            "args": [
-                "--mode",
-                "tune"
-            ]
+            "cwd": "C:\\Users\\Adrian\\Desktop\\MLG-Predicting-Impacful-Events\\train",
         },
         {
             "name": "Hyperparameter tuning Nocturno",
             "type": "python",
             "request": "launch",
-            "program": "train_gnn_llm.py",
+            "program": "hyperparam_tuning.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "C:\\Users\\adria\\Desktop\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
-            "args": [
-                "--mode",
-                "tune"
-            ]
+            "cwd": "C:\\Users\\adria\\Desktop\\MLG-Predicting-Impacful-Events\\train",
         },
         {
             "name": "GNN Training Nocturno",
             "type": "python",
             "request": "launch",
-            "program": "train_gnn_llm.py",
+            "program": "train_gnn.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "C:\\Users\\adria\\Desktop\\MLG-Predicting-Impacful-Events\\train\\gnn_llm",
-            "args": [
-                "--mode",
-                "train"
-            ]
+            "cwd": "C:\\Users\\adria\\Desktop\\MLG-Predicting-Impacful-Events\\train",
         },
         {
             "name": "t-SNE Surface",
@@ -96,10 +80,6 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "cwd": "C:\\Users\\adria\\Desktop\\MLG-Predicting-Impacful-Events\\train\\experimentation",
-            "args": [
-                "--mode",
-                "train"
-            ]
         },
     ]
 }
