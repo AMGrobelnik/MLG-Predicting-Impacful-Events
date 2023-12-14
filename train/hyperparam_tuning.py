@@ -1,13 +1,12 @@
 import train_gnn
 import optuna
 import wandb
-from torch.utils.data import Dataset
-from pathlib import Path
-from glob import glob
-import pickle
+from train_gnn import BatchDataset
 
 
-def hyper_parameter_tuning(train_set, validation_set, test_set, device):
+def hyper_parameter_tuning(
+    train_set, validation_set, test_set, project_name: str, get_config
+):
     """
     Hyperparameter tuning for the GNN model
     :param train_set: set of training data
@@ -17,7 +16,9 @@ def hyper_parameter_tuning(train_set, validation_set, test_set, device):
     study = optuna.create_study(direction="minimize")
 
     study.optimize(
-        lambda trial: objective(trial, train_set, validation_set, test_set, device),
+        lambda trial: objective(
+            trial, train_set, validation_set, test_set, project_name, get_config(trial)
+        ),
         n_trials=500,
     )
 
@@ -29,30 +30,15 @@ def hyper_parameter_tuning(train_set, validation_set, test_set, device):
         print(f"    {key}: {value}")
 
 
-def objective(trial, train_set, validation_set, test_set, device):
-    aggr = trial.suggest_categorical("aggr", ["mean", "attn"])
-
-    attn_size = (
-        0 if aggr == "mean" else trial.suggest_int("attn_size", 32, 256, log=True)
-    )
-
+def objective(trial, train_set, validation_set, test_set, project, config):
     wandb.init(
-        project="llm_full_10p",
+        project=project,
         entity="mlg-events",
         dir=None,
-        config={
-            "lr": trial.suggest_float("lr", 1e-5, 1e-3, log=True),
-            "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True),
-            "hidden_size": trial.suggest_int("hidden_size", 16, 256, log=True),
-            "attn_size": attn_size,
-            "epochs": trial.suggest_int("epochs", 20, 40),
-            "num_layers": trial.suggest_int("num_layers", 3, 5),
-            "aggr": aggr,
-        },
+        config=config,
     )
 
     config = wandb.config
-    config["device"] = device
 
     def epoch_log(epoch, train_losses, val_losses):
         wandb.log(
@@ -87,40 +73,6 @@ def objective(trial, train_set, validation_set, test_set, device):
     return best_loss
 
 
-class BatchDataset(Dataset):
-    """
-    Dataset for loading heterograph objects of data from a folder.
-    TODO: unload from RAM if needed
-    """
-
-    def __init__(self, folder_path, keep_in_memory=False):
-        super().__init__()
-        folder_path = Path(folder_path)
-        batch_files = glob(str(folder_path / "batch*.pkl"))
-
-        self.folder_path = folder_path
-        self.batch_files = batch_files
-        self.loaded = {}
-        self.keep_in_memory = keep_in_memory
-
-    def __len__(self):
-        return len(self.batch_files)
-
-    def __getitem__(self, idx):
-        if self.keep_in_memory and idx in self.loaded:
-            return self.loaded[idx]
-
-        batch_file = self.batch_files[idx]
-
-        with open(batch_file, "rb") as f:
-            batch = pickle.load(f)
-
-        if self.keep_in_memory:
-            self.loaded[idx] = batch
-
-        return batch
-
-
 if __name__ == "__main__":
     # Load the data
     base_dir = "../data/graphs/batches/batches_llm_full/"
@@ -128,4 +80,33 @@ if __name__ == "__main__":
     val_dataset = BatchDataset(base_dir + "val")
     test_dataset = BatchDataset(base_dir + "test")
 
-    hyper_parameter_tuning(train_dataset, val_dataset, test_dataset, "cuda")
+    def get_config(trial):
+        aggr = trial.suggest_categorical("aggr", ["mean", "attn"])
+
+        if aggr == "mean":
+            attn_size = 0
+            hidden_size = trial.suggest_int("hidden_size", 64, 512, log=True)
+            num_layers = trial.suggest_int("num_layers", 3, 5)
+        else:
+            hidden_size = trial.suggest_int("hidden_size", 16, 256, log=True)
+            attn_size = trial.suggest_int("attn_size", 32, 256, log=True)
+            num_layers = trial.suggest_int("num_layers", 3, 5)
+
+        return {
+                "lr": trial.suggest_float("lr", 1e-5, 1e-3, log=True),
+                "weight_decay": trial.suggest_float(
+                    "weight_decay", 1e-5, 1e-3, log=True
+                ),
+                "hidden_size": hidden_size,
+                "attn_size": attn_size,
+                "epochs": trial.suggest_int("epochs", 20, 40),
+                "num_layers": num_layers,
+                "aggr": aggr,
+                "device": "cuda",
+            }
+
+    project_name = "test"
+
+    hyper_parameter_tuning(
+        train_dataset, val_dataset, test_dataset, project_name, get_config
+    )
