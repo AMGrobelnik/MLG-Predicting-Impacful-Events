@@ -279,6 +279,9 @@ def generate_subgraph(target_ids, neighbor_ids, event_index):
             event_type = "event_target" if eid in target_ids else "event"
             add_event(graph, eid, event_type, all_nodes, src_file, llm_file, target_ids)
 
+    if not use_concepts:
+        return graph
+
     # add features to concepts
     for node in graph.nodes():
         if graph.nodes[node]["node_type"] == "concept":
