@@ -1,0 +1,81 @@
+   32 GB VRAM ORIGINAL BATCHES
+   
+    def get_config(trial):
+        aggr = trial.suggest_categorical("aggr", ["mean", "attn"])
+
+        if aggr == "mean":
+            attn_size = 0
+            hidden_size = trial.suggest_int("hidden_size", 64, 400, log=True)
+            num_layers = trial.suggest_int("num_layers", 10, 15)
+        else:
+            hidden_size = trial.suggest_int("hidden_size", 64, 400, log=True)
+            attn_size = trial.suggest_int("attn_size", 64, 400, log=True)
+            num_layers = trial.suggest_int("num_layers", 10, 15)
+
+        return {
+                "lr": trial.suggest_float("lr", 8e-4, 1e-2, log=True),
+                "weight_decay": trial.suggest_float(
+                    "weight_decay", 1e-6, 1e-4, log=True
+                ),
+                "hidden_size": hidden_size,
+                "attn_size": attn_size,
+                "epochs": trial.suggest_int("epochs", 30, 60),
+                "num_layers": num_layers,
+                "aggr": aggr,
+                "device": "cuda",
+            }
+
+   40 GB VRAM ORIGINAL BATCHES
+
+   def get_config(trial):
+        aggr = trial.suggest_categorical("aggr", ["mean", "attn"])
+
+        if aggr == "mean":
+            attn_size = 0
+            hidden_size = trial.suggest_int("hidden_size", 64, 450, log=True)
+            num_layers = trial.suggest_int("num_layers", 10, 15)
+        else:
+            hidden_size = trial.suggest_int("hidden_size", 64, 450, log=True)
+            attn_size = trial.suggest_int("attn_size", 64, 450, log=True)
+            num_layers = trial.suggest_int("num_layers", 8, 15)
+
+        return {
+                "lr": trial.suggest_float("lr", 8e-4, 1e-2, log=True),
+                "weight_decay": trial.suggest_float(
+                    "weight_decay", 1e-6, 1e-4, log=True
+                ),
+                "hidden_size": hidden_size,
+                "attn_size": attn_size,
+                "epochs": trial.suggest_int("epochs", 30, 60),
+                "num_layers": num_layers,
+                "aggr": aggr,
+                "device": "cuda",
+            }
+
+
+    4/6 GB VRAM ORIGINAL BATCHES
+
+    def get_config(trial):
+        aggr = trial.suggest_categorical("aggr", ["mean", "attn"])
+
+        if aggr == "mean":
+            attn_size = 0
+            hidden_size = trial.suggest_int("hidden_size", 64, 512, log=True)
+            num_layers = trial.suggest_int("num_layers", 3, 5)
+        else:
+            hidden_size = trial.suggest_int("hidden_size", 16, 256, log=True)
+            attn_size = trial.suggest_int("attn_size", 32, 256, log=True)
+            num_layers = trial.suggest_int("num_layers", 3, 5)
+
+        return {
+                "lr": trial.suggest_float("lr", 1e-5, 1e-3, log=True),
+                "weight_decay": trial.suggest_float(
+                    "weight_decay", 1e-5, 1e-3, log=True
+                ),
+                "hidden_size": hidden_size,
+                "attn_size": attn_size,
+                "epochs": trial.suggest_int("epochs", 20, 40),
+                "num_layers": num_layers,
+                "aggr": aggr,
+                "device": "cuda",
+            }
