@@ -4,21 +4,16 @@ import torch.nn as nn
 import torch_geometric.nn as pyg_nn
 from torch_sparse import matmul
 
-train_args = {
-    # "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-    "device": "cuda",
-    "hidden_size": 64,
-    "epochs": 200,
-    "weight_decay": 0.0002930387278908051,
-    "lr": 0.05091434725288385,
-    "attn_size": 64,
-    "num_layers": 4,
-    "aggr": "attn",
-}
-
 
 class HeteroGNNConv(pyg_nn.MessagePassing):
     def __init__(self, in_channels_src, in_channels_dst, out_channels):
+        """
+        Initializes the HeteroGNNConv class.
+
+        :param in_channels_src: Number of input channels for source nodes.
+        :param in_channels_dst: Number of input channels for destination nodes.
+        :param out_channels: Number of output channels.
+        """
         super(HeteroGNNConv, self).__init__(aggr="mean")
 
         self.in_channels_src = in_channels_src
@@ -37,6 +32,16 @@ class HeteroGNNConv(pyg_nn.MessagePassing):
         size=None,
         res_n_id=None,
     ):
+        """
+        Performs a forward pass of the HeteroGNNConv layer.
+
+        :param node_feature_src: Input features of source nodes.
+        :param node_feature_dst: Input features of destination nodes.
+        :param edge_index: Graph edge indices.
+        :param size: Size of the graph.
+        :param res_n_id: Residual node indices.
+        :return: Output features after the forward pass.
+        """
         return self.propagate(
             edge_index,
             node_feature_src=node_feature_src,
@@ -46,11 +51,26 @@ class HeteroGNNConv(pyg_nn.MessagePassing):
         )
 
     def message_and_aggregate(self, edge_index, node_feature_src):
+        """
+        Performs message passing and aggregation step.
+
+        :param edge_index: Graph edge indices.
+        :param node_feature_src: Input features of source nodes.
+        :return: Aggregated output features.
+        """
         out = matmul(edge_index, node_feature_src, reduce="mean")
 
         return out
 
     def update(self, aggr_out, node_feature_dst, res_n_id):
+        """
+        Updates the node features based on aggregated features.
+
+        :param aggr_out: Aggregated output features.
+        :param node_feature_dst: Input features of destination nodes.
+        :param res_n_id: Residual node indices.
+        :return: Updated node features.
+        """
         dst_out = self.lin_dst(node_feature_dst)
         aggr_out = self.lin_src(aggr_out)
         aggr_out = torch.cat([dst_out, aggr_out], -1)
@@ -289,27 +309,6 @@ class HeteroGNN(torch.nn.Module):
         :return: The computed loss value.
         """
 
-        # mape = MeanAbsolutePercentageError().to(train_args["device"])
+        loss = torch.mean(torch.square(preds["event_target"] - y["event_target"]))
 
-        loss = 0
-        loss_func = torch.nn.MSELoss()
-        
-        # print("PRED LOSS TRAIN")
-        # print(preds["event_target"])
-        # print(preds["event_target"].shape)
-        mse = torch.mean(torch.square(preds["event_target"] - y["event_target"]))
-        loss = mse
-        # loss += loss_func(preds["event_target"], y["event_target"])
-
-        #
-        # if self.mask_unknown:
-        #     mask = y["event"][indices["event"], 0] != -1
-        #     non_zero_idx = torch.masked_select(indices["event"], mask)
-        #
-        #     loss += loss_func(preds["event"][non_zero_idx], y["event"][non_zero_idx])
-        # else:
-        #     # TODO: check if this is correct
-        #     idx = indices["event"]
-        #     loss += loss_func(preds["event"][id , y["event"][idx]])
-        #
         return loss
