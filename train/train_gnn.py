@@ -10,7 +10,6 @@ import numpy as np
 class BatchDataset(Dataset):
     """
     Dataset for loading heterograph objects of data from a folder.
-    TODO: unload from RAM if needed
     """
 
     def __init__(self, folder_path, keep_in_memory=False):
@@ -19,7 +18,7 @@ class BatchDataset(Dataset):
         batch_files = glob(str(folder_path / "batch*.pkl"))
 
         self.folder_path = folder_path
-        self.batch_files = batch_files
+        self.batch_files = sorted(batch_files)
         self.loaded = {}
         self.keep_in_memory = keep_in_memory
 
@@ -55,7 +54,6 @@ def train_step(model, optimizer, train_graph):
         model.train()
 
     # Set the model's graph to the training graph
-    # TODO: Do we need this?
     model.hetero_graph = train_graph
 
     # Zero out any existing gradients
@@ -76,12 +74,13 @@ def train_step(model, optimizer, train_graph):
     return loss.item()
 
 
-def evaluate(model, graph):
+def evaluate(model, graph, round_preds=False):
     """
     Tests the model on given indices and updates the best model based on validation loss.
 
     :param model: The trained graph neural network model.
     :param graph: The heterogeneous graph data.
+    :param round_preds: Whether to round the predictions to the nearest integer.
     :return: The average L1, MSE, and MAPE loss
     """
     # Make sure the model is in eval mode.
@@ -95,6 +94,9 @@ def evaluate(model, graph):
     preds = model(graph.node_feature, graph.edge_index)
 
     preds = preds["event_target"]
+    if round_preds:
+        preds = torch.round(preds)
+
     actual = graph.node_target["event_target"]
 
     # average L1
@@ -111,7 +113,6 @@ def evaluate(model, graph):
     mse = mse.detach().cpu()
     mape = mape.detach().cpu()
 
-    # TODO: .item()?
     return l1, mse, mape
 
 
@@ -166,7 +167,7 @@ def train_model(train_set: Dataset, val_set: Dataset, train_args, log=None):
         num_layers=train_args["num_layers"],
         aggr=train_args["aggr"]
     )
-    # Move the model to the GPU if available
+    # Move the model to the GPU
     model = model.to(train_args["device"])
 
     # Initialize the optimizer
@@ -233,6 +234,10 @@ def train_model(train_set: Dataset, val_set: Dataset, train_args, log=None):
         if log:
             log(epoch, train_losses, val_losses)
 
+    # unload the model from the GPU
+    del model
+    torch.cuda.empty_cache()
+
     print(f"""Best model: Epoch {best_epoch}, Best Metric Val Loss: {best_loss:.1f}""")
     return best_epoch, best_loss
 
@@ -260,14 +265,18 @@ def test_model(train_set, test_set, train_args):
         batch = graph_to_device(batch, train_args["device"])
 
         # Evaluate
-        l1, mse, mape = evaluate(model, batch)
+        l1, mse, mape = evaluate(model, batch, round_preds=True)
         test_losses.append([l1, mse, mape])
 
         predictions = model(batch.node_feature, batch.edge_index)
-        display_predictions(predictions, batch)
+        display_predictions(predictions, batch, round_preds=True)
 
         # Unload the batch from the GPU
         graph_unload(batch)
+
+    # Unload the model from the GPU
+    del model
+    torch.cuda.empty_cache()
 
     # Get test loss
     test_losses = np.array(test_losses)
@@ -282,12 +291,16 @@ def test_model(train_set, test_set, train_args):
     return test_losses
 
 
-def display_predictions(preds, hetero_graph):
+def display_predictions(preds, hetero_graph, round_preds=False):
     print("Index | Predicted Value | Actual Value | Difference")
     print("-" * 70)  # Adjust the length of the separator line
 
     for i in range(hetero_graph.node_target["event_target"].shape[0]):
         predicted_value = round(preds["event_target"][i].item(), 2)
+
+        if round_preds:
+            predicted_value = int(predicted_value)
+
         actual_value = round(hetero_graph.node_target["event_target"][i].item(), 2)
         difference = round(
             abs(predicted_value - actual_value), 2

@@ -236,7 +236,6 @@ class HeteroGNN(torch.nn.Module):
 
         # Initialize batch normalization and ReLU layers for each layer and node type
         all_node_types = hetero_graph.node_types
-        print(all_node_types)
         for i in range(self.num_layers):
             for node_type in all_node_types:
                 key_bn = f"bn_{i}_{node_type}"
