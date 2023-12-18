@@ -159,13 +159,9 @@ def train_model(train_set: Dataset, val_set: Dataset, train_args, log=None):
     """
 
     # Initialize the model with an example graph
-    # TODO: clean up args in HeteroGNN
-    # TODO: We (probably) don't need the graph, just its params
     model = HeteroGNN(
         train_set[0],
-        train_args,
-        num_layers=train_args["num_layers"],
-        aggr=train_args["aggr"]
+        *train_args,
     )
     # Move the model to the GPU
     model = model.to(train_args["device"])
@@ -250,9 +246,7 @@ def test_model(train_set, test_set, train_args):
 
     model = HeteroGNN(
         train_set[0],
-        train_args,
-        num_layers=train_args["num_layers"],
-        aggr=train_args["aggr"],
+        *train_args,
     )
     model = model.to(train_args["device"])
 

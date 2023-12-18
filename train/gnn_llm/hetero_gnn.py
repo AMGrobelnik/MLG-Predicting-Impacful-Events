@@ -8,20 +8,25 @@ from torch_sparse import matmul
 class HeteroGNNConv(pyg_nn.MessagePassing):
     def __init__(self, in_channels_src, in_channels_dst, out_channels):
         """
-        Initializes the HeteroGNNConv class.
+        Initializes the HeteroGNNConv class. This class represensts a convolutional layer
+        in a heterogeneous graph neural network.
 
         :param in_channels_src: Number of input channels for source nodes.
         :param in_channels_dst: Number of input channels for destination nodes.
         :param out_channels: Number of output channels.
         """
         super(HeteroGNNConv, self).__init__(aggr="mean")
-
-        self.in_channels_src = in_channels_src
+        
+        # Store the number of input and output channels
+        self.in_channels_src = in_channels_src 
         self.in_channels_dst = in_channels_dst
         self.out_channels = out_channels
 
+        # Linear transformation for destination and source node features
         self.lin_dst = nn.Linear(in_channels_dst, out_channels)
         self.lin_src = nn.Linear(in_channels_src, out_channels)
+
+        # A linear layer to update the node features after concatenation
         self.lin_update = nn.Linear(2 * out_channels, out_channels)
 
     def forward(
@@ -34,6 +39,7 @@ class HeteroGNNConv(pyg_nn.MessagePassing):
     ):
         """
         Performs a forward pass of the HeteroGNNConv layer.
+        This method is called during the graph neural network's forward propagation.
 
         :param node_feature_src: Input features of source nodes.
         :param node_feature_dst: Input features of destination nodes.
@@ -42,6 +48,7 @@ class HeteroGNNConv(pyg_nn.MessagePassing):
         :param res_n_id: Residual node indices.
         :return: Output features after the forward pass.
         """
+
         return self.propagate(
             edge_index,
             node_feature_src=node_feature_src,
@@ -58,6 +65,8 @@ class HeteroGNNConv(pyg_nn.MessagePassing):
         :param node_feature_src: Input features of source nodes.
         :return: Aggregated output features.
         """
+
+        # Message passing
         out = matmul(edge_index, node_feature_src, reduce="mean")
 
         return out
@@ -71,16 +80,22 @@ class HeteroGNNConv(pyg_nn.MessagePassing):
         :param res_n_id: Residual node indices.
         :return: Updated node features.
         """
-        dst_out = self.lin_dst(node_feature_dst)
-        aggr_out = self.lin_src(aggr_out)
-        aggr_out = torch.cat([dst_out, aggr_out], -1)
-        aggr_out = self.lin_update(aggr_out)
 
+        # Apply the linear layer to the destination node features
+        dst_out = self.lin_dst(node_feature_dst) 
+        # Apply the linear layer to the aggregated embeddings from the message passing
+        aggr_out = self.lin_src(aggr_out) 
+        # Concatenate the two embeddings
+        aggr_out = torch.cat([dst_out, aggr_out], -1)
+        # Apply another liear layer to the concatenated embeddings, 
+        # this layer combines the information from both sets of features
+        aggr_out = self.lin_update(aggr_out) 
+                                            
         return aggr_out
 
 
 class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
-    def __init__(self, convs, args, aggr="mean"):
+    def __init__(self, convs, attn_size, hidden_size, aggr="mean",):
         """
         Initializes the HeteroGNNWrapperConv instance.
 
@@ -99,9 +114,9 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
 
         if self.aggr == "attn":
             self.attn_proj = nn.Sequential(
-                nn.Linear(args["hidden_size"], args["attn_size"]),
+                nn.Linear(hidden_size, attn_size),
                 nn.Tanh(),
-                nn.Linear(args["attn_size"], 1, bias=False),
+                nn.Linear(attn_size, 1, bias=False),
             )
 
     def reset_parameters(self):
@@ -113,6 +128,8 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
     def forward(self, node_features, edge_indices):
         """
         Forward pass of the model.
+        Calculates the node embeddings after the message passing for each node 
+        and relation type.
 
         :param node_features: Dictionary of node features for each node type.
         :param edge_indices: Dictionary of edge indices for each message type.
@@ -120,26 +137,28 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
         """
 
         message_type_emb = {}
-        for message_key, message_type in edge_indices.items():
-            src_type, edge_type, dst_type = message_key
-            node_feature_src = node_features[src_type]
-            node_feature_dst = node_features[dst_type]
+        for message_key, message_type in edge_indices.items(): # For each message
+            src_type, edge_type, dst_type = message_key # Extract the type of relation
+            node_feature_src = node_features[src_type] # Get the source and destination
+            node_feature_dst = node_features[dst_type] # node features
             edge_index = edge_indices[message_key]
-            message_type_emb[message_key] = self.convs[message_key](
-                node_feature_src,
-                node_feature_dst,
+            message_type_emb[message_key] = self.convs[message_key]( # Apply the appropriate convolutional 
+                node_feature_src,                                    # layer based on the source 
+                node_feature_dst,                                    # and destination node types
                 edge_index,
             )
 
         node_emb = {dst: [] for _, _, dst in message_type_emb.keys()}
-        for (src, edge_type, dst), item in message_type_emb.items():
+        for (_, _, dst), item in message_type_emb.items(): # Get all messages for every destination node
             node_emb[dst].append(item)
 
+        # For every node we aggregate the embeddings we received from the source nodes
         for node_type, embs in node_emb.items():
             if len(embs) == 1:
-                node_emb[node_type] = embs[0]
+                node_emb[node_type] = embs[0] # If there is only one embedding, we don't need to aggregate
             else:
-                node_emb[node_type] = self.aggregate(embs)
+                node_emb[node_type] = self.aggregate(embs) # Otherwise, we aggregate the embeddings
+                                                           # using the specified methord (mean or attention)
 
         return node_emb
 
@@ -152,13 +171,13 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
         """
 
         if self.aggr == "mean":
-            xs = torch.stack(xs)
-            out = torch.mean(xs, dim=0)
+            xs = torch.stack(xs) # Stack the embeddings
+            out = torch.mean(xs, dim=0) # Take the mean
             return out
 
         elif self.aggr == "attn":
-            xs = torch.stack(xs, dim=0)
-            s = self.attn_proj(xs).squeeze(
+            xs = torch.stack(xs, dim=0) # Stack the embeddings
+            s = self.attn_proj(xs).squeeze( 
                 -1
             )  # Pass the xs through the attention layer
             s = torch.mean(
@@ -168,7 +187,7 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
                 s, dim=0
             ).detach()  # Compute the attention probability
             out = self.alpha.reshape(-1, 1, 1) * xs
-            out = torch.sum(out, dim=0)
+            out = torch.sum(out, dim=0) #
             return out
 
         raise ValueError(f"Invalid aggr {self.aggr}, valid options: (mean, attn)")
@@ -213,33 +232,32 @@ class HeteroGNN(torch.nn.Module):
     def __init__(
         self,
         hetero_graph,
-        args,
         num_layers,
-        aggr="mean",
+        aggr,
+        hidden_size,
+        attn_size,
         return_embedding=False,
-        mask_unknown=True,
     ):
         """
         Initializes the HeteroGNN instance.
+
         :param hetero_graph: The heterogeneous graph for which convolutions are to be created.
         :param args: Arguments dictionary containing hyperparameters like hidden_size and attn_size.
         :param num_layers: Number of graph convolutional layers.
         :param aggr: Aggregation method 'mean' or 'attn', defaults to 'mean'.
         :param return_embedding: Boolean indicating if the model should return embeddings or predictions.
-        :param mask_unknown: Boolean indicating if the model should mask unknown nodes (with target -1) when calculating loss.
         """
         super(HeteroGNN, self).__init__()
 
         self.aggr = aggr
-        self.hidden_size = args["hidden_size"]
+        self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.return_embedding = return_embedding
-        self.mask_unknown = mask_unknown
 
         # Use a single ModuleDict for batch normalization and ReLU layers
-        self.bns = nn.ModuleDict()
-        self.relus = nn.ModuleDict()
-        self.convs = nn.ModuleList()
+        self.bns = nn.ModuleDict() # Batch normalization
+        self.relus = nn.ModuleDict() # ReLU
+        self.convs = nn.ModuleList() # Graph convolutional layers
         self.fc = nn.ModuleDict()  # Prediction heads
 
         # Initialize graph convolutional layers for each layer and message type
@@ -249,8 +267,9 @@ class HeteroGNN(torch.nn.Module):
                 generate_convs(
                     hetero_graph, HeteroGNNConv, self.hidden_size, first_layer
                 ),
-                args,
-                self.aggr,
+                aggr=self.aggr,
+                attn_size=attn_size,
+                hidden_size=self.hidden_size,
             )
             self.convs.append(conv)
 
@@ -258,7 +277,7 @@ class HeteroGNN(torch.nn.Module):
         all_node_types = hetero_graph.node_types
         print(all_node_types)
         for i in range(self.num_layers):
-            for node_type in all_node_types:
+            for node_type in all_node_types: # Each node type has its own batch normalization and ReLU
                 key_bn = f"bn_{i}_{node_type}"
                 key_relu = f"relu_{i}_{node_type}"
                 self.bns[key_bn] = nn.BatchNorm1d(self.hidden_size, eps=1.0)
@@ -271,17 +290,18 @@ class HeteroGNN(torch.nn.Module):
     def forward(self, node_feature, edge_index):
         """
         Forward pass of the model.
+        Calculates the GNN node embeddings and applies a prediction head.
 
         :param node_feature: Dictionary of node features for each node type.
         :param edge_index: Dictionary of edge indices for each message type.
         :return: The output embeddings for each node type after passing through the model.
         """
+        # Initialize node embeddings with the input features
         x = node_feature
-
         # Apply graph convolutional, batch normalization, and ReLU layers
         for i in range(self.num_layers):
             x = self.convs[i](x, edge_index)  # Apply the i-th graph convolutional layer
-            for node_type in x:
+            for node_type in x: # Seperately for each node type
                 key_bn = f"bn_{i}_{node_type}"
                 key_relu = f"relu_{i}_{node_type}"
                 x[node_type] = self.bns[key_bn](
@@ -309,6 +329,7 @@ class HeteroGNN(torch.nn.Module):
         :return: The computed loss value.
         """
 
-        loss = torch.mean(torch.square(preds["event_target"] - y["event_target"]))
+        # Loss is calculated only on nodes of type "event_target"
+        loss = torch.mean(torch.square(preds["event_target"] - y["event_target"])) 
 
         return loss
