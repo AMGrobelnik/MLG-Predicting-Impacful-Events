@@ -300,7 +300,7 @@ class HeteroGNN(torch.nn.Module):
 
         # Initialize batch normalization and ReLU layers for each layer and node type
         all_node_types = hetero_graph.node_types
-        print(all_node_types)
+
         for i in range(self.num_layers):
             for node_type in all_node_types: # Each node type has its own batch normalization and ReLU
                 key_bn = f"bn_{i}_{node_type}"
@@ -341,6 +341,7 @@ class HeteroGNN(torch.nn.Module):
             return x
 
         # Apply the prediction head (linear layer)
+        # TODO: Event target only?
         for node_type in x:
             x[node_type] = self.fc[node_type](x[node_type])
 

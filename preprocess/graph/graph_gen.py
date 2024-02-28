@@ -76,7 +76,7 @@ def get_concept_attributes(c: dict) -> dict:
 def get_concepts(event_id: str, concepts: dict):
     nodes = [(c["id"], get_concept_attributes(c)) for c in concepts]
     edges = [
-        (event_id, c["id"], {"edge_type": "related"})  # , "weight": c["score"]
+        (event_id, c["id"], {"edge_type": "related", 'edge_feature': c['score'] / 100})
         for c in concepts
     ]
 
@@ -90,7 +90,7 @@ def get_similar_events(
         (se["uri"], get_event_attributes(se, True, llm_df)) for se in similar_events
     ]
     edges = [
-        (event_id, se["uri"], {"edge_type": "similar"})  # , "weight": se["sim"]
+        (event_id, se["uri"], {"edge_type": "similar", 'edge_feature': se['sim']})
         for se in similar_events
     ]
 
@@ -366,12 +366,12 @@ def get_referenced_ids(n_files: int):
 n = 1
 concepts = True
 similar = True
-llm_embeddings = True
+llm_embeddings = False
 
-remove_isolates = True
-remove_future = True
+remove_isolates = False
+remove_future = False
 future_threshold = 2
-no_unknown = True
+no_unknown = False
 count_feature = False  # include article counts in the node features
 
 embedded_directory = "embedded"

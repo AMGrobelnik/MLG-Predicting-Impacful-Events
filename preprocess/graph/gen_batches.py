@@ -57,6 +57,9 @@ def get_hetero_graph(G):
 
     for key in hete.edge_index:
         edge_index = hete.edge_index[key]
+        edge_weight = (
+            hete.edge_feature[key] if key in hete.edge_feature else None
+        )
 
         adj = SparseTensor(
             row=edge_index[0].long(),
@@ -65,6 +68,7 @@ def get_hetero_graph(G):
                 hete.num_nodes(key[0]),
                 hete.num_nodes(key[2]),
             ),
+            value=edge_weight,
         )
         hete.edge_index[key] = adj.t()
 
@@ -192,12 +196,28 @@ def get_article_counts(event_info):
     :param event_info: event info
     :return: np.array of article counts
     """
-    ALL_LANGS = ['total', 'eng', 'spa', 'zho', 'deu', 'slv', 'ita', 'hrv', 'rus', 'fra', 'por', 'cat', 'tur', 'ara', 'srp']
-    articleCounts = event_info['articleCounts']
+    ALL_LANGS = [
+        "total",
+        "eng",
+        "spa",
+        "zho",
+        "deu",
+        "slv",
+        "ita",
+        "hrv",
+        "rus",
+        "fra",
+        "por",
+        "cat",
+        "tur",
+        "ara",
+        "srp",
+    ]
+    articleCounts = event_info["articleCounts"]
 
     counts = np.zeros(len(ALL_LANGS))
     for lang in articleCounts.keys():
-        if lang == 'total':
+        if lang == "total":
             continue
         counts[ALL_LANGS.index(lang)] = articleCounts[lang]
 
@@ -227,9 +247,7 @@ def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file, target_ids
     target = None
 
     if e_type == "event":
-        features = np.concatenate(
-            [article_counts, features], dtype=np.float32
-        )
+        features = np.concatenate([article_counts, features], dtype=np.float32)
     else:
         target = np.array([event_counts], dtype=np.float32)
 
@@ -252,6 +270,7 @@ def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file, target_ids
     for se in similar:
         se_id = se["uri"]
         se_date = se["eventDate"]
+        se_weight = se["sim"]
         if se_id not in all_nodes:
             continue
 
@@ -263,15 +282,23 @@ def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file, target_ids
         if e_from in target_ids or e_type == "event_target":
             continue
 
-        graph.add_edge(e_from, e_to, edge_type="similar")
+        graph.add_edge(
+            e_from, e_to, edge_type="similar", edge_feature=se_weight
+        )
 
     # add concepts
     if use_concepts:
         for concept in concepts:
             concept_id = concept["id"]
+            concept_weight = concept["score"] / 100
 
             graph.add_node(concept_id, node_type="concept")
-            graph.add_edge(concept_id, event_id, edge_type="related")
+            graph.add_edge(
+                concept_id,
+                event_id,
+                edge_type="related",
+                edge_feature=concept_weight,
+            )
             graph.add_edge(concept_id, concept_id, edge_type="concept_self")
 
 
