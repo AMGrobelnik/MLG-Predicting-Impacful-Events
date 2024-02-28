@@ -186,6 +186,24 @@ def load_files(files_to_idx):
     return src_files, llm_files
 
 
+def get_article_counts(event_info):
+    """
+    Returns the article counts for each language
+    :param event_info: event info
+    :return: np.array of article counts
+    """
+    ALL_LANGS = ['total', 'eng', 'spa', 'zho', 'deu', 'slv', 'ita', 'hrv', 'rus', 'fra', 'por', 'cat', 'tur', 'ara', 'srp']
+    articleCounts = event_info['articleCounts']
+
+    counts = np.zeros(len(ALL_LANGS))
+    for lang in articleCounts.keys():
+        if lang == 'total':
+            continue
+        counts[ALL_LANGS.index(lang)] = articleCounts[lang]
+
+    return counts
+
+
 def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file, target_ids):
     """
     Adds an event to the graph
@@ -199,7 +217,8 @@ def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file, target_ids
 
     event = src_file[event_id]
     info = event["info"]
-    event_counts = info["articleCounts"]["total"]
+    article_counts = get_article_counts(info)
+    event_counts = article_counts[0]
     event_date = info["eventDate"] / 16600  # normalize by max date
     concepts = info["concepts"]
     similar = event["similar_events"]
@@ -209,7 +228,7 @@ def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file, target_ids
 
     if e_type == "event":
         features = np.concatenate(
-            [np.array([event_counts]), features], dtype=np.float32
+            [article_counts, features], dtype=np.float32
         )
     else:
         target = np.array([event_counts], dtype=np.float32)
