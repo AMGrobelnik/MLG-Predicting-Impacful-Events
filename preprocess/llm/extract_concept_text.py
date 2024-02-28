@@ -2,26 +2,43 @@ import os
 import pandas as pd
 from tqdm import tqdm
 
-from preprocess.preprocess import save_df_to_pickle
+# from ..preprocess import save_df_to_pickle
+
+
+def save_df_to_pickle(dataframe, output_dir, file_name):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    file_path = os.path.join(output_dir, f"{file_name}.pkl")
+
+    try:
+        dataframe.to_pickle(file_path)
+    except Exception as e:
+        print(f"Error saving DataFrame to '{file_path}': {str(e)}")
+
+
+# from .. import save_df_to_pickle
 
 ids = set()
 errs = 0
+
+
 def extract_text(file_path: str):
     global ids, errs
     with open(file_path, "rb") as f:
         df = pd.read_pickle(f)
 
-    data = pd.DataFrame(columns=['id', 'label'])
+    data = pd.DataFrame(columns=["id", "label"])
     data.set_index("id", inplace=True)
 
     for i, event in df.iterrows():
         try:
-            concepts = event['info']["concepts"]
+            concepts = event["info"]["concepts"]
             for concept in concepts:
-                c_id = concept['id']
+                c_id = concept["id"]
                 if c_id not in ids:
                     ids.add(c_id)
-                    data.loc[c_id] = [concept['labelEng']]
+                    data.loc[c_id] = [concept["labelEng"]]
         except:
             errs += 1
             continue
@@ -30,13 +47,13 @@ def extract_text(file_path: str):
 
 
 if __name__ == "__main__":
-    directory_path = "../../data/preprocessed"
+    directory_path = "../../data/preprocessed_filtered"
     output_dir = "../../data/text"
 
     files = sorted(os.listdir(directory_path))
     files = [filename for filename in files if filename.endswith(".pkl")]
 
-    data = pd.DataFrame(columns=['id', 'label'])
+    data = pd.DataFrame(columns=["id", "label"])
     data.set_index("id", inplace=True)
 
     for filename in tqdm(files, ncols=100, desc="Processing"):

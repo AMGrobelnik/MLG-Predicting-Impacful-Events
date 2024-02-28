@@ -10,6 +10,24 @@
             "justMyCode": true,
         },
         {
+            "name": "Python: Current File LLM",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "C:\\Users\\Adrian\\Desktop\\MLG-Predicting-Impacful-Events\\preprocess\\llm"
+        },
+        {
+            "name": "Python: Current File Preprocess",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "C:\\Users\\Adrian\\Desktop\\MLG-Predicting-Impacful-Events\\preprocess"
+        },
+        {
             "name": "graph_gen",
             "type": "python",
             "request": "launch",
