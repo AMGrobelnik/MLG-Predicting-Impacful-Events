@@ -1,8 +1,10 @@
 import torch
+import torch.nn.functional as F
 import deepsnap
 import torch.nn as nn
 import torch_geometric.nn as pyg_nn
 from torch_sparse import matmul
+
 
 
 class HeteroGNNConv(pyg_nn.MessagePassing):
@@ -237,6 +239,8 @@ class HeteroGNN(torch.nn.Module):
         hidden_size,
         attn_size,
         return_embedding=False,
+        classification=False,
+        num_classes=-1
     ):
         """
         Initializes the HeteroGNN instance.
@@ -246,6 +250,8 @@ class HeteroGNN(torch.nn.Module):
         :param num_layers: Number of graph convolutional layers.
         :param aggr: Aggregation method 'mean' or 'attn', defaults to 'mean'.
         :param return_embedding: Boolean indicating if the model should return embeddings or predictions.
+        :param classification: Turn entire model into classification model.
+        :param num_classes: How many classes are there (only for classification=True).
         """
         super(HeteroGNN, self).__init__()
 
@@ -253,6 +259,8 @@ class HeteroGNN(torch.nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.return_embedding = return_embedding
+        self.classification = classification
+        self.num_classes = num_classes
 
         # Use a single ModuleDict for batch normalization and ReLU layers
         self.bns = nn.ModuleDict() # Batch normalization
@@ -285,7 +293,10 @@ class HeteroGNN(torch.nn.Module):
 
         # Initialize fully connected layers for each node type
         for node_type in all_node_types:
-            self.fc[node_type] = nn.Linear(self.hidden_size, 1)
+            if self.classification:
+                self.fc[node_type] = nn.Linear(self.hidden_size, 1)
+            else:
+                self.fc[node_type] = nn.Linear(self.hidden_size, num_classes)
 
     def forward(self, node_feature, edge_index):
         """
@@ -329,7 +340,13 @@ class HeteroGNN(torch.nn.Module):
         :return: The computed loss value.
         """
 
-        # Loss is calculated only on nodes of type "event_target"
-        loss = torch.mean(torch.square(preds["event_target"] - y["event_target"])) 
+        if self.classification:
+            # Loss is calculated only on nodes of type "event_target"
+            softmax_preds = F.softmax(preds["event_target"], dim=1)
+            loss = F.cross_entropy(softmax_preds, y["event_target"])
+        
+        else:
+            # Loss is calculated only on nodes of type "event_target"
+            loss = torch.mean(torch.square(preds["event_target"] - y["event_target"])) 
 
         return loss
