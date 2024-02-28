@@ -6,7 +6,6 @@ import torch_geometric.nn as pyg_nn
 from torch_sparse import matmul
 
 
-
 class HeteroGNNConv(pyg_nn.MessagePassing):
     def __init__(self, in_channels_src, in_channels_dst, out_channels):
         """
@@ -18,9 +17,9 @@ class HeteroGNNConv(pyg_nn.MessagePassing):
         :param out_channels: Number of output channels.
         """
         super(HeteroGNNConv, self).__init__(aggr="mean")
-        
+
         # Store the number of input and output channels
-        self.in_channels_src = in_channels_src 
+        self.in_channels_src = in_channels_src
         self.in_channels_dst = in_channels_dst
         self.out_channels = out_channels
 
@@ -84,20 +83,26 @@ class HeteroGNNConv(pyg_nn.MessagePassing):
         """
 
         # Apply the linear layer to the destination node features
-        dst_out = self.lin_dst(node_feature_dst) 
+        dst_out = self.lin_dst(node_feature_dst)
         # Apply the linear layer to the aggregated embeddings from the message passing
-        aggr_out = self.lin_src(aggr_out) 
+        aggr_out = self.lin_src(aggr_out)
         # Concatenate the two embeddings
         aggr_out = torch.cat([dst_out, aggr_out], -1)
-        # Apply another liear layer to the concatenated embeddings, 
+        # Apply another liear layer to the concatenated embeddings,
         # this layer combines the information from both sets of features
-        aggr_out = self.lin_update(aggr_out) 
-                                            
+        aggr_out = self.lin_update(aggr_out)
+
         return aggr_out
 
 
 class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
-    def __init__(self, convs, attn_size, hidden_size, aggr="mean",):
+    def __init__(
+        self,
+        convs,
+        attn_size,
+        hidden_size,
+        aggr="mean",
+    ):
         """
         Initializes the HeteroGNNWrapperConv instance.
 
@@ -130,7 +135,7 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
     def forward(self, node_features, edge_indices):
         """
         Forward pass of the model.
-        Calculates the node embeddings after the message passing for each node 
+        Calculates the node embeddings after the message passing for each node
         and relation type.
 
         :param node_features: Dictionary of node features for each node type.
@@ -139,28 +144,40 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
         """
 
         message_type_emb = {}
-        for message_key, message_type in edge_indices.items(): # For each message
-            src_type, edge_type, dst_type = message_key # Extract the type of relation
-            node_feature_src = node_features[src_type] # Get the source and destination
-            node_feature_dst = node_features[dst_type] # node features
+        for message_key, message_type in edge_indices.items():  # For each message
+            src_type, edge_type, dst_type = message_key  # Extract the type of relation
+            node_feature_src = node_features[src_type]  # Get the source and destination
+            node_feature_dst = node_features[dst_type]  # node features
             edge_index = edge_indices[message_key]
-            message_type_emb[message_key] = self.convs[message_key]( # Apply the appropriate convolutional 
-                node_feature_src,                                    # layer based on the source 
-                node_feature_dst,                                    # and destination node types
+            message_type_emb[message_key] = self.convs[
+                message_key
+            ](  # Apply the appropriate convolutional
+                node_feature_src,  # layer based on the source
+                node_feature_dst,  # and destination node types
                 edge_index,
             )
 
         node_emb = {dst: [] for _, _, dst in message_type_emb.keys()}
-        for (_, _, dst), item in message_type_emb.items(): # Get all messages for every destination node
+        for (
+            _,
+            _,
+            dst,
+        ), item in (
+            message_type_emb.items()
+        ):  # Get all messages for every destination node
             node_emb[dst].append(item)
 
         # For every node we aggregate the embeddings we received from the source nodes
         for node_type, embs in node_emb.items():
             if len(embs) == 1:
-                node_emb[node_type] = embs[0] # If there is only one embedding, we don't need to aggregate
+                node_emb[node_type] = embs[
+                    0
+                ]  # If there is only one embedding, we don't need to aggregate
             else:
-                node_emb[node_type] = self.aggregate(embs) # Otherwise, we aggregate the embeddings
-                                                           # using the specified methord (mean or attention)
+                node_emb[node_type] = self.aggregate(
+                    embs
+                )  # Otherwise, we aggregate the embeddings
+                # using the specified methord (mean or attention)
 
         return node_emb
 
@@ -173,13 +190,13 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
         """
 
         if self.aggr == "mean":
-            xs = torch.stack(xs) # Stack the embeddings
-            out = torch.mean(xs, dim=0) # Take the mean
+            xs = torch.stack(xs)  # Stack the embeddings
+            out = torch.mean(xs, dim=0)  # Take the mean
             return out
 
         elif self.aggr == "attn":
-            xs = torch.stack(xs, dim=0) # Stack the embeddings
-            s = self.attn_proj(xs).squeeze( 
+            xs = torch.stack(xs, dim=0)  # Stack the embeddings
+            s = self.attn_proj(xs).squeeze(
                 -1
             )  # Pass the xs through the attention layer
             s = torch.mean(
@@ -189,7 +206,7 @@ class HeteroGNNWrapperConv(deepsnap.hetero_gnn.HeteroConv):
                 s, dim=0
             ).detach()  # Compute the attention probability
             out = self.alpha.reshape(-1, 1, 1) * xs
-            out = torch.sum(out, dim=0) #
+            out = torch.sum(out, dim=0)  #
             return out
 
         raise ValueError(f"Invalid aggr {self.aggr}, valid options: (mean, attn)")
@@ -240,7 +257,7 @@ class HeteroGNN(torch.nn.Module):
         attn_size,
         return_embedding=False,
         classification=False,
-        num_classes=-1
+        num_classes=-1,
     ):
         """
         Initializes the HeteroGNN instance.
@@ -263,9 +280,9 @@ class HeteroGNN(torch.nn.Module):
         self.num_classes = num_classes
 
         # Use a single ModuleDict for batch normalization and ReLU layers
-        self.bns = nn.ModuleDict() # Batch normalization
-        self.relus = nn.ModuleDict() # ReLU
-        self.convs = nn.ModuleList() # Graph convolutional layers
+        self.bns = nn.ModuleDict()  # Batch normalization
+        self.relus = nn.ModuleDict()  # ReLU
+        self.convs = nn.ModuleList()  # Graph convolutional layers
         self.fc = nn.ModuleDict()  # Prediction heads
 
         # Initialize graph convolutional layers for each layer and message type
@@ -294,9 +311,9 @@ class HeteroGNN(torch.nn.Module):
         # Initialize fully connected layers for each node type
         for node_type in all_node_types:
             if self.classification:
-                self.fc[node_type] = nn.Linear(self.hidden_size, 1)
-            else:
                 self.fc[node_type] = nn.Linear(self.hidden_size, num_classes)
+            else:
+                self.fc[node_type] = nn.Linear(self.hidden_size, 1)
 
     def forward(self, node_feature, edge_index):
         """
@@ -312,7 +329,7 @@ class HeteroGNN(torch.nn.Module):
         # Apply graph convolutional, batch normalization, and ReLU layers
         for i in range(self.num_layers):
             x = self.convs[i](x, edge_index)  # Apply the i-th graph convolutional layer
-            for node_type in x: # Seperately for each node type
+            for node_type in x:  # Seperately for each node type
                 key_bn = f"bn_{i}_{node_type}"
                 key_relu = f"relu_{i}_{node_type}"
                 x[node_type] = self.bns[key_bn](
@@ -344,9 +361,9 @@ class HeteroGNN(torch.nn.Module):
             # Loss is calculated only on nodes of type "event_target"
             softmax_preds = F.softmax(preds["event_target"], dim=1)
             loss = F.cross_entropy(softmax_preds, y["event_target"])
-        
+
         else:
             # Loss is calculated only on nodes of type "event_target"
-            loss = torch.mean(torch.square(preds["event_target"] - y["event_target"])) 
+            loss = torch.mean(torch.square(preds["event_target"] - y["event_target"]))
 
         return loss
