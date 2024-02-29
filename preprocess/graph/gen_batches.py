@@ -190,11 +190,12 @@ def load_files(files_to_idx):
     return src_files, llm_files
 
 
-def get_article_counts(event_info):
+def get_article_counts(event_info, normalize=True):
     """
-    Returns the article counts for each language
+    Returns the article counts for each language, normalized by the total count
     :param event_info: event info
-    :return: np.array of article counts
+    :param normalize: whether to normalize the counts
+    :return: np array of article counts
     """
     ALL_LANGS = [
         "total",
@@ -214,12 +215,16 @@ def get_article_counts(event_info):
         "srp",
     ]
     articleCounts = event_info["articleCounts"]
-
+    total = articleCounts["total"]
     counts = np.zeros(len(ALL_LANGS))
+
     for lang in articleCounts.keys():
-        if lang == "total":
-            continue
-        counts[ALL_LANGS.index(lang)] = articleCounts[lang]
+        val = articleCounts[lang]
+
+        if normalize and lang != "total":
+            val = val / total
+
+        counts[ALL_LANGS.index(lang)] = val
 
     return counts
 
@@ -238,7 +243,7 @@ def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file, target_ids
     event = src_file[event_id]
     info = event["info"]
     article_counts = get_article_counts(info)
-    event_counts = article_counts[0]
+    event_counts = article_counts[0]  # total article counts
     event_date = info["eventDate"] / 16600  # normalize by max date
     concepts = info["concepts"]
     similar = event["similar_events"]
@@ -271,6 +276,7 @@ def add_event(graph, event_id, e_type, all_nodes, src_file, llm_file, target_ids
         se_id = se["uri"]
         se_date = se["eventDate"]
         se_weight = se["sim"]
+
         if se_id not in all_nodes:
             continue
 
