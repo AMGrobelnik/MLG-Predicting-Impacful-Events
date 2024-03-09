@@ -343,7 +343,7 @@ class HeteroGNN(torch.nn.Module):
         # Apply the prediction head (linear layer)
         # TODO: Event target only?
         for node_type in x:
-            if node_type == "event":
+            if node_type == "event_target":
                 x[node_type] = self.fc[node_type](x[node_type])
 
         return x
